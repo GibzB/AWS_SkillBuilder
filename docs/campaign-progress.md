@@ -115,3 +115,77 @@ clear of the rate limits.
   there's nothing to automate that isn't gaming.
 - The platform's throttles are a signal to go human-paced; the daily habit both
   earns the badges and stays within the limits.
+
+---
+
+## Badge strategy — the 90-day plan
+
+This turns the badge list above into a dated, sequenced plan. The spine is the
+daily 6-step habit; the milestones below tell you WHEN each badge should land
+if you keep the chain unbroken. Day 1 of this plan = the next day you start the
+daily habit (you're already mid-series, so start now).
+
+### Priority order (what to protect first)
+
+1. **Never break a streak.** A missed day resets a 90-day counter to zero — the
+   most expensive mistake available. The single highest-value action each day
+   is the <60-second visit. Do that even on days you do nothing else.
+2. **Publish weekly, not just daily.** The 4-Week Article Publishing Streak only
+   needs ONE article per calendar week — the 21-day run covers this easily, but
+   don't let a whole week pass with zero publishes once the series ends.
+3. **Engage genuinely.** Likes + comments feed three streaks AND seed the impact
+   badges. One real comment a day does double duty.
+4. **Impact badges are lagging indicators.** You can't force them; they arrive
+   as your back-catalog accumulates likes/replies. Keep publishing useful stuff
+   and they follow.
+
+### Timeline — when each badge should land
+
+| Milestone | Day of habit | Badges that unlock | Depends on |
+|-----------|:------------:|--------------------|------------|
+| Week 1 close | Day 7 | 7-Day Like Streak, 7-Day Comment Streak | ≥1 like + ≥1 comment every day |
+| Week 4 close | Day 28 | 30-Day Visit Streak, 30-Day Like Streak, 30-Day Comment Streak, 4-Week Article Publishing Streak | unbroken daily habit + weekly publish |
+| Week 13 close | Day 90 | 90-Day Visit Streak, 90-Day Like Streak, 90-Day Comment Streak | unbroken daily habit for 90 days |
+| Rolling | as engagement accrues | Valued Creator, Conversation Starter, Meaningful Contributor, Idea Influencer | real likes/replies/votes from others |
+| Optional | weekly for 4 weeks | 4-Week Wish Vote Streak | vote on 1 wish per week |
+
+> Note the Like/Comment streaks already show "in progress" — if those counters
+> are mid-chain, protect them: a single missed day restarts them at 0.
+
+### The daily 6-step habit (copy this, do it every day)
+
+Tie it to the "Day N ready to post" email the automation sends you:
+
+1. ☐ **Visit** Builder Center while signed in (the streak-saver — never skip).
+2. ☐ **Publish** the day's drafted article (while the 21-day series lasts).
+3. ☐ **Like** ≥1 piece of content you genuinely found useful.
+4. ☐ **Comment** ≥1 genuine comment on someone else's content.
+5. ☐ **Reply** to any new comments/likes on your own posts.
+6. ☐ **Vote** on 1 wish (only needed ~weekly for the wish badges).
+
+Steps 1, 3, 4 are the non-negotiable streak-feeders (<5 min total). Steps 2, 5,
+6 are situational. On a zero-energy day, do at least steps 1, 3, 4.
+
+### After the 21-day series ends
+
+The publishing run finishes on day 21, but the big streak badges need 90 days.
+Keep going:
+
+- **Keep visiting daily** → 90-Day Visit Streak (the headline badge).
+- **Keep liking + commenting daily** → 90-Day Like/Comment Streaks.
+- **Publish something weekly** (doesn't have to be daily) → keeps the publishing
+  cadence alive and keeps feeding the impact badges with fresh content.
+- **Re-run the harvester** every week or two to refresh this file:
+  `AWS_PROFILE=K1-Kitstek-Billy python tools/builder_publish/harvest_badges.py`
+  then update the ✅/🔄/⚪ lists above.
+
+### Weekly streak tracker (tick a box each day you keep the chain)
+
+Protecting the chain matters more than any single day's content. Mark each day
+you completed steps 1/3/4 (visit + like + comment).
+
+- Week 1:  ☐ ☐ ☐ ☐ ☐ ☐ ☐  → 7-day Like + Comment streaks
+- Week 2:  ☐ ☐ ☐ ☐ ☐ ☐ ☐
+- Week 3:  ☐ ☐ ☐ ☐ ☐ ☐ ☐
+- Week 4:  ☐ ☐ ☐ ☐ ☐ ☐ ☐  → 30-day Visit/Like/Comment + 4-Week Publishing
+- Weeks 5–13: keep the chain → 90-day Visit/Like/Comment at day 90
