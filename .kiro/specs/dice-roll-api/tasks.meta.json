@@ -1,0 +1,333 @@
+{
+  "pbtResults": {
+    "5.2 Write property test for valid sides producing a bounded 200 roll": {
+      "status": "passed",
+      "lastRunTimestamp": 1791641118007
+    },
+    "5.3 Write property test for falsy/unparseable sides defaulting to a six-sided roll": {
+      "status": "passed",
+      "lastRunTimestamp": 1791641119458
+    },
+    "5.4 Write property test for fractional sides strings truncating toward zero": {
+      "status": "passed",
+      "lastRunTimestamp": 1791641120859
+    },
+    "5.5 Write property test for out-of-range sides producing the standard 400 error": {
+      "status": "passed",
+      "lastRunTimestamp": 1791641121803
+    },
+    "5.6 Write property test for every response body being valid JSON": {
+      "status": "passed",
+      "lastRunTimestamp": 1791641122939
+    }
+  },
+  "executionHistory": {
+    "1. Create the project directory structure": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640284942
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640302097
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640338645
+      }
+    ],
+    "2.1 Write `dice-roll-api/lambda/index.mjs`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285067
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640344051
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640729980
+      }
+    ],
+    "3.1 Write `dice-roll-api/template.yaml`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285145
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640344919
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640731301
+      }
+    ],
+    "4.1 Create `dice-roll-api/package.json`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285178
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640345014
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640732201
+      }
+    ],
+    "5.1 Write the test file scaffold `dice-roll-api/tests/handler.test.mjs`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285244
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640738373
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640787603
+      }
+    ],
+    "7.1 Run the local test suite": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285280
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640923397
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641135956
+      }
+    ],
+    "8. Checkpoint - handler and local tests": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285325
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641141389
+      }
+    ],
+    "9.1 Run `sam validate` and `sam build`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285349
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641143222
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641895496
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641901764
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642101457
+      }
+    ],
+    "10.1 Deploy the stack with the SAM CLI": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285376
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642136600
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642277405
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642283246
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642871037
+      }
+    ],
+    "11.1 Curl the deployed endpoint and assert responses": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285404
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642874966
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791643639617
+      }
+    ],
+    "12. Final checkpoint - deployed and verified": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640285427
+      },
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791643644405
+      }
+    ],
+    "2. Implement the Lambda handler": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640730013
+      }
+    ],
+    "3. Declare the SAM infrastructure": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640731323
+      }
+    ],
+    "4. Set up the local test project": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640732268
+      }
+    ],
+    "5. Implement property-based tests for the handler": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640787655
+      }
+    ],
+    "5.2 Write property test for valid sides producing a bounded 200 roll": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640793959
+      },
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640911091
+      }
+    ],
+    "5.3 Write property test for falsy/unparseable sides defaulting to a six-sided roll": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640912554
+      }
+    ],
+    "5.4 Write property test for fractional sides strings truncating toward zero": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640913388
+      }
+    ],
+    "5.5 Write property test for out-of-range sides producing the standard 400 error": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640914929
+      }
+    ],
+    "5.6 Write property test for every response body being valid JSON": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640916433
+      }
+    ],
+    "6.1 Write example and contract unit tests in `dice-roll-api/tests/handler.test.mjs`": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640917056
+      }
+    ],
+    "6. Implement example/edge unit tests for the handler": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791640917110
+      }
+    ],
+    "7. Verify the handler locally": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791641136052
+      }
+    ],
+    "9. Validate and build with the SAM CLI": [
+      {
+        "executionId": "5eb40db9-3ac2-44e8-beed-af2a61c00872",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642101535
+      }
+    ],
+    "10. Deploy to AWS (requires live AWS access, profile K1-Kitstek-Billy)": [
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791642871142
+      }
+    ],
+    "11. Smoke-test the live endpoint (requires live AWS access, profile K1-Kitstek-Billy)": [
+      {
+        "executionId": "24df8fff-ad93-4e52-ba2c-645801f101ca",
+        "chatSessionId": "sess_fafeff4c-ed14-46ab-9af5-c82ac96a4ee9",
+        "timestamp": 1791643639687
+      }
+    ]
+  }
+}

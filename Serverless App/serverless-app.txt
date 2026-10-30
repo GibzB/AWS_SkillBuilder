@@ -1,0 +1,303 @@
+Build a Serverless Dice Roll API
+Your first serverless project on AWS comes with no servers, no stress, just dice. 🎲
+
+Esin Saribudak
+Esin Saribudak
+Follow
+AWS Employee
+Technical Content Creator
+Published Apr 1, 2026Last modified Apr 29, 2026
+
+57
+
+38
+
+
+
+Last updated: April 29, 2026
+Every time you check the weather on your phone, scroll through a playlist, or tap "order" on a delivery app, you're using an API. An API is how applications talk to each other. One app sends a request, another sends back data. They're the invisible plumbing behind almost everything you do online.
+What you’re building
+In this tutorial, you’ll create a Dice Roll API. In practical terms, this means a web endpoint (a URL that accepts requests and returns data) that rolls a die and returns the result as JSON (JavaScript Object Notation), a standard format for sending data between systems. You'll use AWS Lambda  to run your code and Amazon API Gateway  to make it accessible from anywhere. No servers to manage or infrastructure to patch and maintain. Just your code, running in the cloud.
+If you just deployed a static website with AWS Amplify in the previous tutorial, this is the natural next step: going from a site that displays content to a backend that does something. And this something is for those folks who love tabletop RPGs. You're going to build a dice roller that accepts sides as a parameter and returns a roll, and you're going to put it in the cloud. It's a small project, but the pattern is the same one behind any app with a backend, everything from a chat bot, a game, a form that saves data.
+By the end, you'll have a live URL that does this:
+1
+GET https://your-api-url.amazonaws.com/Prod/roll?sides=20
+
+GET is an HTTP request method — it's how your browser or terminal asks a server for data. The part of the URL after the ? is a query string parameter, which is how you pass options to the API.
+1
+2
+3
+4
+{
+  "sides": 20,
+  "roll": 17
+}
+
+Why Lambda and API Gateway
+You could spin up a server, install Node.js, write an Express app, set up a domain, and keep the whole thing patched and running. Or you could skip all of that.
+Lambda runs your code without you managing any servers. You upload a function, and Lambda runs it only when someone calls your API. The rest of the time, it's idle, and you're not paying for that idle time. Lambda supports Node.js, Python, Java, Go, and more languages.
+API Gateway gives your Lambda function a public URL and handles HTTP routing. When a GET request comes in to /roll, API Gateway invokes your function and returns the response. It also can also handle things like throttling and request validation for you.Together, they're the standard pattern for building lightweight serverless APIs on AWS.
+AND, deploying this API completes the “Create a web app using AWS Lambda” Free Tier activity, which will earn you an additional $20 in Free Tier credits.
+What you'll need
+An AWS account  (Check out this guide if you haven’t set up a Free plan account yet)
+AWS SAM CLI  installed
+Node.js 24 or later  installed
+A terminal and a text editor
+If you don't have the SAM CLI yet, don't worry, because it takes about two minutes to install. SAM (Serverless Application Model) is a tool that makes it easy to build and deploy serverless apps on AWS. Think of it as the shortcut between "I wrote a function" and "it's deployed on AWS."
+Now that you know what you need to get started, let's roll. (Sorry, had to 😭)
+Step 1: Create your project
+Open your terminal and run:
+1
+2
+3
+mkdir dice-roll-api
+cd dice-roll-api
+mkdir lambda
+
+These commands will create a folder (directory) called dice-roll-api, change directory into that folder, and make a subfolder called lambda.
+Your project structure now looks like this:
+1
+2
+dice-roll-api/
+└── lambda/
+
+Step 2: Write the Lambda function
+Create a file in the lambda/ folder called index.mjs and add the following code:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+export const handler = async (event) => {
+  // API Gateway passes query string params (?sides=20) through the event object.
+  const params = event.queryStringParameters || {};
+  // Default to a standard 6-sided die if we don't get a value for sides.
+  const sides = parseInt(params.sides) || 6; 
+  // A 1-sided die isn't a die, and anything more than 100 sides is just chaos. We'll return a client error. 
+  if (sides < 2 || sides > 100) {
+    return {
+      statusCode: 400,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: "Sides must be between 2 and 100.",
+      }),
+    };
+  }
+
+  // Calculate a random integer between 1 and sides.
+  const result = Math.floor(Math.random() * sides) + 1;
+
+  // Lambda functions behind API Gateway return this shape:
+  // statusCode, headers, and a stringified body
+  return {
+    statusCode: 200,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sides: sides,
+      roll: result,
+    }),
+  };
+};
+
+Step 3: Define your infrastructure
+In the dice-roll-api folder, create a file called template.yaml (YAML is a human-readable configuration format — think of it as a way to describe what you want AWS to build) in the root of your project.
+Technically, you could set up all of the resources for your API by clicking through the AWS Management Console. But defining your infrastructure in a file like this is called Infrastructure as Code (IaC), and it's a better habit to build early. Your setup is repeatable (run one command and get the same result every time), shareable (hand the file to a teammate and they can deploy the same thing), and reversible (tear it all down with sam delete). Console clicking doesn't give you any of that.
+Copy the following code into template.yaml.
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Dice Roll API - A serverless API that rolls dice
+
+Resources:
+  DiceRollFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs24.x
+      CodeUri: lambda/
+      Timeout: 5
+      MemorySize: 128
+      Events:
+        RollDice:
+          Type: Api
+          Properties:
+            Path: /roll
+            Method: get
+
+Outputs:
+  DiceRollApi:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/roll"
+
+This is a SAM template. It tells AWS to create the following:
+A Lambda function (DiceRollFunction) that runs your index.handler code on Node.js 24 (or later)
+An API Gateway endpoint that invokes the function when someone sends a GET request to /roll
+An output that gives you the URL of your API after deployment
+The CodeUri: lambda/ line tells SAM where your code lives. The Events section is really important. This is where SAM automatically creates the API Gateway endpoint for you and wires it to your function.
+Your project structure should now look like the following:
+1
+2
+3
+4
+dice-roll-api/
+└── lambda/
+    └── index.mjs
+└── template.yaml
+
+Step 4: Build and deploy
+First, validate your template.yaml file. This makes sure your file is free from any obvious structural or syntax errors. Run the following command in your terminal.
+1
+sam validate
+
+Then, build your project. This packages your code and prepares it for deployment.
+1
+sam build
+
+Then deploy to AWS:
+1
+sam deploy --guided
+
+SAM will walk you through a series of prompts. Here's what to enter for each prompt:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+Stack Name [sam-app]: dice-roll-api
+AWS Region [us-east-1]: (press Enter for default, or type your preferred region)
+Confirm changes before deploy [y/N]: y
+Allow SAM CLI IAM role creation [Y/n]: y
+Disable rollback [y/N]: (press Enter for default)
+DiceRollFunction has no authentication. Is this okay? [y/N]: y
+Save arguments to configuration file [Y/n]: y
+SAM configuration file [samconfig.toml]: (press Enter)
+SAM configuration environment [default]: (press Enter)
+
+A few notes on what these mean:
+Stack Name is what AWS calls your collection of resources. Name it whatever you want.
+Allow SAM CLI IAM role creation — IAM (Identity and Access Management) controls permissions in AWS. SAM needs to create a role so your Lambda function has permission to run.
+DiceRollFunction has no authentication — this means anyone with the URL can call your API. That's fine for a public dice roller.
+Save arguments to configuration file — this saves your choices to samconfig.toml so next time you can just run sam deploy without the --guided flag.
+SAM packages your code, uploads it to AWS, and creates everything defined in your template. After a minute or two, you'll see an output like:
+1
+2
+3
+Key                 DiceRollApi
+Description         API Gateway endpoint URL
+Value               https://abc123xyz.execute-api.us-east-1.amazonaws.com/Prod/roll
+
+That URL is your API endpoint. It's alive!! Copy it and try invoking it with a curl request in your terminal:
+1
+curl "https://abc123xyz.execute-api.us-east-1.amazonaws.com/Prod/roll?sides=12"
+
+We need the quotes around the URL, otherwise the string would break in the terminal around the question mark for the query parameter!
+1
+{"sides": 12, "roll": 10}
+
+Try rolling the die without any query parameters:
+1
+curl "https://abc123xyz.execute-api.us-east-1.amazonaws.com/Prod/roll"
+
+Possible result:
+1
+{"sides": 6, "roll": 4}
+
+You just deployed a dice roller to the cloud. Your party would be proud. 🧙
+This API has no authentication, which means anyone with the URL can call it. API Gateway includes default throttling  that limits how many requests your API will accept, but treat your endpoint like your WiFi password: share it with your party, not the whole internet.
+What happened behind the scenes
+When you ran sam deploy, SAM and AWS did a few things for you:
+Your code was packaged and uploaded to Amazon S3. SAM zipped your lambda/ folder and stored it in an S3 bucket. This is where Lambda pulls your code from when it needs to run your function.
+AWS CloudFormation created your infrastructure. SAM translated your template.yaml into a CloudFormation stack. CloudFormation read your template, created the Lambda function, set up the API Gateway, wired them together, and configured the IAM permissions your function needs to run. If you ever run sam delete, CloudFormation tears down all the resources in the stack.
+API Gateway is routing HTTP requests to your function. When someone sends a GET request to your URL, API Gateway receives it, extracts the query string parameters, and invokes your Lambda function with an event object containing those parameters. Your function runs, returns a response, and API Gateway sends it back to the caller.
+Lambda runs your function only when it's called. There's no server sitting around waiting. When a request comes in, Lambda spins up an execution environment, runs your handler function, and returns the result. If nobody calls your API for an hour, nothing is running and nothing is costing you money. If a thousand people call it at once, Lambda scales automatically.
+What this costs
+Lambda provides 1 million free requests per month, plus 400,000 GB-seconds of compute time. Any usage beyond that is deducted from your Free Tier credits under the Free plan, but with a demo app like this, it would be very hard to exceed to those limits.
+API Gateway charges $3.50 per million requests for REST API calls in us-east-1. This usage will also be deducted from your Free Tier credits under the Free plan.
+When I built and deployed this app, I ended up invoking the API only nine times, which amounted to a grand total of USD 0.00. If you keep this running as a hobby app, you’ll likely stay under $1 per month.
+
+You can check your usage anytime in the AWS Billing Console . Be sure to sign in as the root user in the account for access to billing information.
+Make it your own
+Here are some ideas to keep going:
+Add multiple dice: Accept a count parameter (?sides=6&count=4) and return an array of rolls. Hint: use a loop and push results into an array.
+Add flavor text: Return a message with the roll. Natural 20? "Critical hit!" Roll a 1? "Critical fail. Your mass-rename just broke prod."
+Roll with advantage: Add a ?advantage=true parameter that rolls twice and returns the higher result. (D&D players, you know what this is.)
+Track roll history: Add an Amazon DynamoDB table (a serverless database service) to store rolls and create a GET /history endpoint. Now you're building a real app.
+Each of these teaches you something new — arrays, conditional logic, new AWS services. Pick one and see where it takes you.
+Clean up
+If you want to remove everything you just created:
+1
+sam delete
+
+Output:
+1
+2
+3
+4
+5
+6
+7
+ ~/dice-roll-api ✨ ❯ sam delete
+Are you sure you want to delete the stack dice-roll-api in the region us-east-1 ? [y/N]: y
+Are you sure you want to delete the folder dice-roll-api in S3 which contains the artifacts? [y/N]: y
+- Deleting S3 object with key dice-roll-api/be63b8bf202771f2330536a7466764f0
+- Deleting S3 object with key dice-roll-api/326d7a39e7f5773a8b4d1d0d7a501a79.template
+- Deleting Cloudformation stack dice-roll-api
+Deleted successfully
+
+SAM will remove the Lambda function, API Gateway, and any other associated resources so that you have a clean slate.
+Next steps
+You just built a serverless application. But what if you wanted a server?
+In the next project in this series, you'll launch an Amazon EC2 instance, connect to it securely, and serve a web page with httpd (a popular web server). It's a different model, where you're managing the machine, and understanding both approaches will make you a stronger cloud developer.
+This project is part of the AWS Free Tier onboarding series. Everything you built here runs within the Free Tier — no surprise bills, just learning.

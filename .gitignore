@@ -1,0 +1,48 @@
+# macOS
+.DS_Store
+
+# Embedded sub-project with its own git history (not part of this repo)
+dice-roll-api/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+build/
+dist/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!config/example.tfvars
+crash.log
+
+# Secrets - never commit
+*.pem
+*.key
+.env
+.env.*
+
+# Builder Center local tool: browser profile (holds YOUR session) and captured
+# inspection artifacts. Local-only, never commit.
+tools/builder_publish/inspection_report.json
+tools/builder_publish/inspection_page.png
+tools/builder_publish/assisted_day_*.png
+tools/builder_publish/tags_vocabulary.json
+tools/builder_publish/diagnose_tags.json
+tools/builder_publish/tag_api_capture.json
+tools/builder_publish/probe_tag_endpoint.json
+tools/builder_publish/searchtags_probe.json
+tools/builder_publish/picker_options.json
+tools/builder_publish/tags_selectable.json
+tools/builder_publish/badges.json
+tools/builder_publish/badges_raw.txt
+tools/builder_publish/badges_raw.html
+tools/builder_publish/badges_page.png
+.aws-builder-publish/
