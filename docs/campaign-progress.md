@@ -2,44 +2,55 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
+> 🔥 **Current posting streak: Day 0** — next publish (day 6) starts a fresh
+> chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
+> day 6 was skipped.) Update this number each time you publish.
+
 Three stages per day:
 - **S3**: article generated, validated, and published to S3/CloudFront (automated).
 - **BC draft**: filled into the Builder Center editor (title/description/body + auto-tags) via the assisted tool.
 - **BC published**: you clicked Publish on Builder Center (live post).
+- **Streak**: consecutive-posting counter. 🔥 N = Nth day of the current
+  unbroken chain; `· broken` = part of a previous, now-ended streak.
 
 Command to draft a day:
 ```
 AWS_PROFILE=K1-Kitstek-Billy python tools/builder_publish/batch_publish.py --from N --to N --auto-tags
 ```
 
-| Day | Topic | S3 | BC draft | BC published | Notes |
-|----:|-------|:--:|:--------:|:------------:|-------|
-| 1 | AWS account fundamentals & security mindset | ✅ | ✅ | ✅ | published live |
-| 2 | IAM users, roles, least privilege | ✅ | ✅ | ✅ | published live |
-| 3 | Amazon S3 fundamentals | ✅ | ✅ | ✅ | published live |
-| 4 | S3 lifecycle & storage optimization | ✅ | ✅ | ✅ | published live |
-| 5 | Amazon EC2 fundamentals | ✅ | ✅ | ✅ | published live |
-| 6 | EC2 security groups | ✅ | ⬜ | ⬜ | NEXT — resume here |
-| 7 | Amazon VPC fundamentals | ✅ | ⬜ | ⬜ | |
-| 8 | Subnets, route tables, internet access | ✅ | ⬜ | ⬜ | |
-| 9 | AWS Lambda | ✅ | ⬜ | ⬜ | |
-| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | |
-| 11 | Amazon EventBridge | ✅ | ⬜ | ⬜ | |
-| 12 | Amazon CloudWatch | ✅ | ⬜ | ⬜ | |
-| 13 | AWS Systems Manager | ✅ | ⬜ | ⬜ | |
-| 14 | Amazon DynamoDB | ✅ | ⬜ | ⬜ | |
-| 15 | Amazon RDS fundamentals | ✅ | ⬜ | ⬜ | |
-| 16 | Amazon SNS | ✅ | ⬜ | ⬜ | |
-| 17 | Infrastructure as Code (Terraform/CloudFormation) | ✅ | ⬜ | ⬜ | |
-| 18 | AWS security fundamentals | ✅ | ⬜ | ⬜ | |
-| 19 | AWS cost optimization | ✅ | ⬜ | ⬜ | |
-| 20 | Serverless architecture patterns | ✅ | ⬜ | ⬜ | |
-| 21 | Lessons learned: connecting the fundamentals | ✅ | ⬜ | ⬜ | |
+| Day | Topic | S3 | BC draft | BC published | Streak | Notes |
+|----:|-------|:--:|:--------:|:------------:|:------:|-------|
+| 1 | AWS account fundamentals & security mindset | ✅ | ✅ | ✅ | · broken | prev streak |
+| 2 | IAM users, roles, least privilege | ✅ | ✅ | ✅ | · broken | prev streak |
+| 3 | Amazon S3 fundamentals | ✅ | ✅ | ✅ | · broken | prev streak |
+| 4 | S3 lifecycle & storage optimization | ✅ | ✅ | ✅ | · broken | prev streak |
+| 5 | Amazon EC2 fundamentals | ✅ | ✅ | ✅ | · broken | prev streak (chain ended — day 6 skipped) |
+| 6 | EC2 security groups | ✅ | ⬜ | ⬜ | 🔥 1 | NEXT — fresh streak starts here |
+| 7 | Amazon VPC fundamentals | ✅ | ⬜ | ⬜ | 🔥 2 | |
+| 8 | Subnets, route tables, internet access | ✅ | ⬜ | ⬜ | 🔥 3 | |
+| 9 | AWS Lambda | ✅ | ⬜ | ⬜ | 🔥 4 | |
+| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | 🔥 5 | |
+| 11 | Amazon EventBridge | ✅ | ⬜ | ⬜ | 🔥 6 | |
+| 12 | Amazon CloudWatch | ✅ | ⬜ | ⬜ | 🔥 7 | |
+| 13 | AWS Systems Manager | ✅ | ⬜ | ⬜ | 🔥 8 | |
+| 14 | Amazon DynamoDB | ✅ | ⬜ | ⬜ | 🔥 9 | |
+| 15 | Amazon RDS fundamentals | ✅ | ⬜ | ⬜ | 🔥 10 | |
+| 16 | Amazon SNS | ✅ | ⬜ | ⬜ | 🔥 11 | |
+| 17 | Infrastructure as Code (Terraform/CloudFormation) | ✅ | ⬜ | ⬜ | 🔥 12 | |
+| 18 | AWS security fundamentals | ✅ | ⬜ | ⬜ | 🔥 13 | |
+| 19 | AWS cost optimization | ✅ | ⬜ | ⬜ | 🔥 14 | |
+| 20 | Serverless architecture patterns | ✅ | ⬜ | ⬜ | 🔥 15 | |
+| 21 | Lessons learned: connecting the fundamentals | ✅ | ⬜ | ⬜ | 🔥 16 | |
 
 > S3 column assumes the campaign articles are generated (they were, in the last
 > full run). Verify a day's S3 page by opening
 > `https://d1x0urkz16usf1.cloudfront.net/day/NNNN.html`.
-> Update BC draft / published columns as you go.
+> As you go: tick the BC draft / published boxes, and bump the 🔥 banner at the
+> top to the streak day you just published.
+>
+> The 🔥 numbers for days 7–21 are PROJECTED — they assume you publish on
+> consecutive days. If you skip a day, the chain breaks: mark that day
+> `· broken` and restart the next published day at 🔥 1.
 
 ## Builder Center badges — live status & strategy
 
