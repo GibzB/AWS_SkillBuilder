@@ -2,7 +2,7 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
-> 🔥 **Current posting streak: Day 0** — next publish (day 6) starts a fresh
+> 🔥 **Current posting streak: Day 1** — keep publishing consecutive days to extend the chain.
 > chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
 > day 6 was skipped.) Update this number each time you publish.
 
@@ -25,22 +25,22 @@ AWS_PROFILE=K1-Kitstek-Billy python tools/builder_publish/batch_publish.py --fro
 | 3 | Amazon S3 fundamentals | ✅ | ✅ | ✅ | · broken | prev streak |
 | 4 | S3 lifecycle & storage optimization | ✅ | ✅ | ✅ | · broken | prev streak |
 | 5 | Amazon EC2 fundamentals | ✅ | ✅ | ✅ | · broken | prev streak (chain ended — day 6 skipped) |
-| 6 | EC2 security groups | ✅ | ⬜ | ⬜ | 🔥 1 | NEXT — fresh streak starts here |
-| 7 | Amazon VPC fundamentals | ✅ | ⬜ | ⬜ | 🔥 2 | |
-| 8 | Subnets, route tables, internet access | ✅ | ⬜ | ⬜ | 🔥 3 | |
-| 9 | AWS Lambda | ✅ | ⬜ | ⬜ | 🔥 4 | |
-| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | 🔥 5 | |
-| 11 | Amazon EventBridge | ✅ | ⬜ | ⬜ | 🔥 6 | |
-| 12 | Amazon CloudWatch | ✅ | ⬜ | ⬜ | 🔥 7 | |
-| 13 | AWS Systems Manager | ✅ | ⬜ | ⬜ | 🔥 8 | |
-| 14 | Amazon DynamoDB | ✅ | ⬜ | ⬜ | 🔥 9 | |
-| 15 | Amazon RDS fundamentals | ✅ | ⬜ | ⬜ | 🔥 10 | |
-| 16 | Amazon SNS | ✅ | ⬜ | ⬜ | 🔥 11 | |
-| 17 | Infrastructure as Code (Terraform/CloudFormation) | ✅ | ⬜ | ⬜ | 🔥 12 | |
-| 18 | AWS security fundamentals | ✅ | ⬜ | ⬜ | 🔥 13 | |
-| 19 | AWS cost optimization | ✅ | ⬜ | ⬜ | 🔥 14 | |
-| 20 | Serverless architecture patterns | ✅ | ⬜ | ⬜ | 🔥 15 | |
-| 21 | Lessons learned: connecting the fundamentals | ✅ | ⬜ | ⬜ | 🔥 16 | |
+| 6 | EC2 security groups | ✅ | ✅ | ✅ | 🔥 1 | published live — fresh streak start |
+| 7 | Amazon VPC fundamentals | ✅ | ⬜ | ⬜ | · broken | NEXT — resume here |
+| 8 | Subnets, route tables, internet access | ✅ | ⬜ | ⬜ | · broken | |
+| 9 | AWS Lambda | ✅ | ⬜ | ⬜ | · broken | |
+| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | · broken | |
+| 11 | Amazon EventBridge | ✅ | ⬜ | ⬜ | · broken | |
+| 12 | Amazon CloudWatch | ✅ | ⬜ | ⬜ | · broken | |
+| 13 | AWS Systems Manager | ✅ | ⬜ | ⬜ | · broken | |
+| 14 | Amazon DynamoDB | ✅ | ⬜ | ⬜ | · broken | |
+| 15 | Amazon RDS fundamentals | ✅ | ⬜ | ⬜ | · broken | |
+| 16 | Amazon SNS | ✅ | ⬜ | ⬜ | · broken | |
+| 17 | Infrastructure as Code (Terraform/CloudFormation) | ✅ | ⬜ | ⬜ | · broken | |
+| 18 | AWS security fundamentals | ✅ | ⬜ | ⬜ | · broken | |
+| 19 | AWS cost optimization | ✅ | ⬜ | ⬜ | · broken | |
+| 20 | Serverless architecture patterns | ✅ | ⬜ | ⬜ | · broken | |
+| 21 | Lessons learned: connecting the fundamentals | ✅ | ⬜ | ⬜ | · broken | |
 
 > S3 column assumes the campaign articles are generated (they were, in the last
 > full run). Verify a day's S3 page by opening
