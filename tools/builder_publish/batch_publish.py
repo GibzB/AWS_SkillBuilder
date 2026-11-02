@@ -37,6 +37,7 @@ from playwright.sync_api import sync_playwright, Page, TimeoutError as PwTimeout
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from suggest_tags import suggest_tag_terms  # noqa: E402
 from choose_tags import choose_tags, load_vocabulary  # noqa: E402
+import progress_tracker  # noqa: E402
 
 CREATE_URL = "https://builder.aws.com/create/content"
 LOGIN_URL = "https://builder.aws.com/"
@@ -375,6 +376,15 @@ def main(argv: list[str] | None = None) -> int:
                 created += 1
                 print(f"  filled title/description/body.")
 
+                # Auto-stamp the checklist: the editor is now filled, so the
+                # BC-draft stage is a fact we can record. Publishing is still a
+                # manual click, so we only tick 'published' after you confirm.
+                try:
+                    progress_tracker.mark_drafted(day)
+                    print(f"  checklist: marked day {day} drafted.")
+                except Exception as error:  # noqa: BLE001 - never block publishing
+                    print(f"  (checklist draft update skipped: {error})")
+
                 if args.auto_tags and chosen_tags:
                     print(f"  auto-selecting tags: {', '.join(chosen_tags)}")
                     add, fail = _select_tags(page, chosen_tags)
@@ -399,14 +409,38 @@ def main(argv: list[str] | None = None) -> int:
                 except Exception:  # noqa: BLE001
                     pass
                 print("  >>> Review tags, then log in / click Publish (or leave as draft).")
+                print(
+                    "      When prompted, enter 'p' if you clicked PUBLISH so the "
+                    "checklist records it and bumps the streak."
+                )
                 try:
-                    ans = input("  Press Enter to finish this run, or 'c' to try the next day: ")
+                    ans = input(
+                        "  [Enter]=stop (left as draft)  'p'=published & stop  "
+                        "'c'=next day: "
+                    )
                 except (EOFError, KeyboardInterrupt):
                     stopped_reason = "interrupted by user"
                     break
-                if ans.strip().lower() != "c":
-                    stopped_reason = "you chose to stop after this article"
-                    break
+
+                choice = ans.strip().lower()
+                if choice in ("p", "pc", "cp"):
+                    try:
+                        streak = progress_tracker.mark_published(day)
+                        print(
+                            f"  checklist: marked day {day} PUBLISHED; "
+                            f"current posting streak is 🔥 {streak}."
+                        )
+                    except Exception as error:  # noqa: BLE001
+                        print(f"  (checklist publish update skipped: {error})")
+
+                # Continue to the next day only if the user asked ('c' or 'pc').
+                if "c" in choice:
+                    continue
+                stopped_reason = (
+                    "you published and stopped" if choice.startswith("p")
+                    else "you chose to stop after this article"
+                )
+                break
         except KeyboardInterrupt:
             stopped_reason = "interrupted by user"
 
