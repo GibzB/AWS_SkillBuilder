@@ -2,7 +2,7 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
-> 🔥 **Current posting streak: Day 3** — keep publishing consecutive days to extend the chain.
+> 🔥 **Current posting streak: Day 4** — keep publishing consecutive days to extend the chain.
 > chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
 > day 6 was skipped.) Update this number each time you publish.
 
@@ -28,8 +28,8 @@ AWS_PROFILE=K1-Kitstek-Billy python tools/builder_publish/batch_publish.py --fro
 | 6 | EC2 security groups | ✅ | ✅ | ✅ | 🔥 1 | published live — fresh streak start |
 | 7 | Amazon VPC fundamentals | ✅ | ✅ | ✅ | 🔥 2 | published live |
 | 8 | Subnets, route tables, internet access | ✅ | ✅ | ✅ | 🔥 3 | published live |
-| 9 | AWS Lambda | ✅ | ⬜ | ⬜ | · broken | NEXT — resume here |
-| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | · broken | |
+| 9 | AWS Lambda | ✅ | ✅ | ✅ | 🔥 4 | published live |
+| 10 | Amazon API Gateway | ✅ | ⬜ | ⬜ | · broken | NEXT — resume here |
 | 11 | Amazon EventBridge | ✅ | ⬜ | ⬜ | · broken | |
 | 12 | Amazon CloudWatch | ✅ | ⬜ | ⬜ | · broken | |
 | 13 | AWS Systems Manager | ✅ | ⬜ | ⬜ | · broken | |
