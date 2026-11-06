@@ -13,7 +13,9 @@
 
 locals {
   articles_enabled = var.publisher_selection == "s3" ? 1 : 0
-  articles_bucket  = "${local.name_prefix}-articles"
+  # S3 bucket names are global, so include the account ID. This lets the same
+  # campaign deploy to any account without a name collision.
+  articles_bucket = "${local.name_prefix}-articles-${data.aws_caller_identity.current.account_id}"
 }
 
 # --- Private S3 bucket --------------------------------------------------------
