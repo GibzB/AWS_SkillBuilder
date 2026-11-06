@@ -44,7 +44,7 @@ AWS_PROFILE=K1-Kitstek-Billy python tools/builder_publish/batch_publish.py --fro
 
 > S3 column assumes the campaign articles are generated (they were, in the last
 > full run). Verify a day's S3 page by opening
-> `https://d1x0urkz16usf1.cloudfront.net/day/NNNN.html`.
+> `https://d2e14hwggytv3g.cloudfront.net/day/NNNN.html`.
 > As you go: tick the BC draft / published boxes, and bump the 🔥 banner at the
 > top to the streak day you just published.
 >
