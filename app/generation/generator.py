@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from dataclasses import replace
 from importlib import resources
 from typing import Any, Callable, Protocol, TypeVar
 
@@ -39,6 +40,8 @@ __all__ = [
     "GENERATION_TIMEOUT_SECONDS",
     "PROMPT_RESOURCE",
     "MAX_OUTPUT_TOKENS",
+    "SEO_TITLE_MAX",
+    "SEO_DESCRIPTION_MAX",
     "BedrockClient",
     "TimeoutRunner",
     "ThreadTimeoutRunner",
@@ -52,10 +55,16 @@ GENERATION_TIMEOUT_SECONDS = 120.0
 # Bounded output size to minimize token cost (Bedrock Design). A short article
 # fits comfortably; a runaway response is truncated by the model, then rejected
 # by parsing/validation if malformed.
-MAX_OUTPUT_TOKENS = 1500
+MAX_OUTPUT_TOKENS = 4000
+
+# Builder Center's SEO recommendations (soft targets; the hard limits stay at
+# TITLE_MAX / DESCRIPTION_MAX). See ContentGenerator._tighten.
+SEO_TITLE_MAX = 60
+SEO_DESCRIPTION_MAX = 160
+TIGHTEN_MAX_TOKENS = 300
 
 # Versioned prompt asset packaged with the application (Requirement 20.1).
-PROMPT_RESOURCE = ("app.prompts", "article_v1.md")
+PROMPT_RESOURCE = ("app.prompts", "article_v2.md")
 
 # Delimiter separating the metadata JSON header from the raw Markdown body in
 # the two-part output format. Matched on its own line, tolerating surrounding
@@ -161,7 +170,61 @@ class ContentGenerator:
                 reason="unavailable",
             ) from error
 
-        return self._parse(raw, spec)
+        return self._tighten(self._parse(raw, spec))
+
+    def _tighten(self, article: Article) -> Article:
+        """Best-effort shortening of title/description to SEO targets.
+
+        Builder Center recommends titles within 60 and descriptions within 160
+        characters for search results. The main prompt asks for that, but
+        models count characters poorly, so when a field still overshoots we make
+        ONE small follow-up call to rewrite just that field. A field is replaced
+        only when the rewrite is non-empty and within target; on any failure the
+        original (already within the hard 255/512 limits) is kept, so SEO can
+        never turn a good article into a failed day.
+        """
+        title_over = len(article.title) > SEO_TITLE_MAX
+        description_over = len(article.description) > SEO_DESCRIPTION_MAX
+        if not (title_over or description_over):
+            return article
+        prompt = (
+            "Shorten this AWS article's metadata for search results. Keep the "
+            "meaning and the AWS service name.\n"
+            f"- title: at most {SEO_TITLE_MAX} characters.\n"
+            f"- description: at most {SEO_DESCRIPTION_MAX} characters, one or two "
+            "sentences, and it must not repeat the title.\n"
+            'Return ONLY a JSON object: {"title": "...", "description": "..."}\n\n'
+            f"Topic: {article.topic}\n"
+            f"Current title: {article.title}\n"
+            f"Current description: {article.description}\n"
+        )
+        try:
+            raw = self._timeout_runner.run(
+                self._timeout_seconds,
+                lambda: self._client.invoke(prompt, TIGHTEN_MAX_TOKENS),
+            )
+            payload = self._extract_json(raw)
+        except Exception:  # noqa: BLE001 - best effort; keep the valid original
+            return article
+
+        title, description = article.title, article.description
+        new_title = payload.get("title")
+        if (
+            title_over
+            and isinstance(new_title, str)
+            and new_title.strip()
+            and len(new_title) <= SEO_TITLE_MAX
+        ):
+            title = new_title.strip()
+        new_description = payload.get("description")
+        if (
+            description_over
+            and isinstance(new_description, str)
+            and new_description.strip()
+            and len(new_description) <= SEO_DESCRIPTION_MAX
+        ):
+            description = new_description.strip()
+        return replace(article, title=title, description=description)
 
     def build_prompt(self, spec: GenerationSpec) -> str:
         """Render the versioned template with the spec's bounded parameters.
@@ -178,6 +241,8 @@ class ContentGenerator:
         substitutions = {
             "{title_max}": str(spec.title_max),
             "{description_max}": str(spec.description_max),
+            "{seo_title_max}": str(SEO_TITLE_MAX),
+            "{seo_description_max}": str(SEO_DESCRIPTION_MAX),
             "{tags_min}": str(TAGS_MIN),
             "{tags_max}": str(spec.tags_max),
         }
@@ -372,7 +437,14 @@ class ContentGenerator:
                 message="generated tags are missing or not a list",
                 reason="empty_field",
             )
-        tags = tuple(str(t) for t in value if isinstance(t, str) and t.strip())
+        # De-duplicate case-insensitively, keeping first-seen order. DynamoDB
+        # string sets reject duplicate members, so a repeated tag from the model
+        # would otherwise fail the whole write.
+        seen: dict[str, str] = {}
+        for t in value:
+            if isinstance(t, str) and t.strip():
+                seen.setdefault(t.strip().casefold(), t)
+        tags = tuple(seen.values())
         if len(tags) < TAGS_MIN or len(tags) > TAGS_MAX:
             raise GenerationError(
                 message=f"generated tag count {len(tags)} is outside {TAGS_MIN}..{TAGS_MAX}",

@@ -55,6 +55,11 @@ output "articles_base_url" {
   value       = var.publisher_selection == "s3" ? "https://${aws_cloudfront_distribution.articles[0].domain_name}" : ""
 }
 
+output "monthly_budget_name" {
+  description = "AWS Budgets monthly cost budget name (empty when disabled)."
+  value       = var.monthly_budget_usd > 0 ? aws_budgets_budget.monthly[0].name : ""
+}
+
 output "articles_bucket" {
   description = "Private S3 bucket holding article HTML (s3 publisher only)."
   value       = var.publisher_selection == "s3" ? aws_s3_bucket.articles[0].bucket : ""

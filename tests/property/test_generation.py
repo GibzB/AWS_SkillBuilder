@@ -132,7 +132,12 @@ def test_property_8_roundtrip_preserves_fields(
     assert article.title == title
     assert article.description == description
     assert article.body_markdown == body
-    assert article.tags == tuple(tags)
+    # Tags are de-duplicated case-insensitively (first occurrence wins) because
+    # DynamoDB string sets reject duplicate members.
+    expected: dict[str, str] = {}
+    for tag in tags:
+        expected.setdefault(tag.strip().casefold(), tag)
+    assert article.tags == tuple(expected.values())
     assert article.learning_takeaway == takeaway
 
 

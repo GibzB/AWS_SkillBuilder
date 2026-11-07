@@ -30,6 +30,13 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  # Every taggable resource this configuration creates (now and in future)
+  # inherits these tags automatically, so cost allocation and ownership are
+  # never dependent on remembering to tag a new resource.
+  default_tags {
+    tags = local.common_tags
+  }
 }
 
 data "aws_caller_identity" "current" {}

@@ -106,12 +106,13 @@ def load_config(env: dict[str, str] | None = None) -> EngineConfig:
 
 
 class BedrockRuntimeClient:
-    """Thin boundary wrapper over boto3 bedrock-runtime InvokeModel.
+    """Thin boundary wrapper over the Bedrock Converse API.
 
     Satisfies the generator's ``BedrockClient`` protocol (``invoke(prompt,
-    max_tokens) -> str``). Uses the Amazon Bedrock Converse-style Messages API
-    body for the configured model and extracts the generated text. Kept minimal
-    and isolated so the generator stays testable with a fake.
+    max_tokens) -> str``). Converse is model-agnostic, so swapping between
+    Amazon Nova, Anthropic Claude, or any other chat model is a configuration
+    change (``BEDROCK_MODEL_ID``) with no code change. Kept minimal and isolated
+    so the generator stays testable with a fake.
     """
 
     def __init__(self, client: Any, model_id: str) -> None:
@@ -120,25 +121,16 @@ class BedrockRuntimeClient:
 
     def invoke(self, prompt: str, max_tokens: int) -> str:
         """Invoke the model and return the raw generated text."""
-        body = {
-            "messages": [{"role": "user", "content": [{"text": prompt}]}],
-            "inferenceConfig": {"maxTokens": max_tokens, "temperature": 0.2},
-        }
-        response = self._client.invoke_model(
+        response = self._client.converse(
             modelId=self._model_id,
-            body=json.dumps(body).encode("utf-8"),
-            contentType="application/json",
-            accept="application/json",
+            messages=[{"role": "user", "content": [{"text": prompt}]}],
+            inferenceConfig={"maxTokens": max_tokens, "temperature": 0.2},
         )
-        raw = response["body"].read()
-        payload = json.loads(raw)
-        # Nova/Converse-style response: output.message.content[].text
-        output = payload.get("output", {}).get("message", {}).get("content", [])
-        for part in output:
-            if isinstance(part, dict) and "text" in part:
-                return str(part["text"])
-        # Fallback for models that return a top-level text field.
-        return str(payload.get("outputText", ""))
+        parts = response.get("output", {}).get("message", {}).get("content", [])
+        # Concatenate every text block (some models split output across blocks).
+        return "".join(
+            str(part["text"]) for part in parts if isinstance(part, dict) and "text" in part
+        )
 
 
 def _build_orchestrator(
@@ -164,7 +156,7 @@ def _build_orchestrator(
     generator = ContentGenerator(
         BedrockRuntimeClient(bedrock, config.bedrock_model_id)
     )
-    validator = ContentValidator()
+    validator = ContentValidator(require_cli_example=True)
     # Build the S3 publisher's dependencies only when selected, so the mock
     # path needs no S3 client. The bucket/base URL come from env config.
     publisher_config = PublisherConfig(

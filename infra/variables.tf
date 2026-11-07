@@ -220,7 +220,22 @@ variable "lambda_timeout_seconds" {
 }
 
 variable "tags" {
-  description = "Common tags applied to all taggable resources."
+  description = "Extra tags merged into the standard Project/CampaignId/ManagedBy tags and applied to all taggable resources."
   type        = map(string)
   default     = {}
+}
+
+variable "monthly_budget_usd" {
+  description = <<-EOT
+    Monthly AWS Budgets limit in USD for the whole account. Email alerts go to
+    notification_email at 50%, 80% and 100% of actual spend and when forecasted
+    spend is projected to exceed 100%. Set to 0 to disable the budget.
+  EOT
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = var.monthly_budget_usd >= 0
+    error_message = "monthly_budget_usd must be zero (disabled) or a positive number of US dollars."
+  }
 }

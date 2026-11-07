@@ -273,3 +273,74 @@ def test_prompt_asset_contains_anti_fabrication_and_voice_rules() -> None:
     assert "{title_max}" in template
     assert "{description_max}" in template
     assert "{tags_max}" in template
+
+
+# -- SEO tightening (title <= 60, description <= 160) -------------------------
+
+
+class _SequencedClient:
+    """Returns the given responses in order and records every prompt."""
+
+    def __init__(self, *responses: str) -> None:
+        self._responses = list(responses)
+        self.prompts: list[str] = []
+
+    def invoke(self, prompt: str, max_tokens: int) -> str:
+        self.prompts.append(prompt)
+        return self._responses.pop(0) if self._responses else "not json"
+
+
+def _two_part(title: str, description: str) -> str:
+    return (
+        json.dumps(
+            {
+                "title": title,
+                "description": description,
+                "tags": ["aws", "iam"],
+                "learning_takeaway": "I learned least privilege matters.",
+            }
+        )
+        + "\n---BODY---\n# IAM\n\nOne thing I learned...\n"
+    )
+
+
+def _seo_generator(client: _SequencedClient) -> ContentGenerator:
+    return ContentGenerator(
+        client=client, timeout_runner=ImmediateTimeoutRunner(), prompt_template=_PROMPT
+    )
+
+
+def test_within_seo_targets_makes_no_extra_call() -> None:
+    client = _SequencedClient(_two_part("Learning IAM", "A short note."))
+    article = _seo_generator(client).generate(_spec())
+    assert article.title == "Learning IAM"
+    assert len(client.prompts) == 1
+
+
+def test_overlong_title_and_description_are_tightened() -> None:
+    long_title = "Exploring Amazon EventBridge: Simplifying Event-Driven Architectures"
+    long_desc = "x" * 200
+    client = _SequencedClient(
+        _two_part(long_title, long_desc),
+        json.dumps({"title": "Amazon EventBridge rules and targets", "description": "How rules route events."}),
+    )
+    article = _seo_generator(client).generate(_spec())
+    assert article.title == "Amazon EventBridge rules and targets"
+    assert article.description == "How rules route events."
+    assert len(client.prompts) == 2 and "at most 60 characters" in client.prompts[1]
+
+
+def test_failed_tighten_keeps_valid_original() -> None:
+    long_title = "T" * 80
+    client = _SequencedClient(_two_part(long_title, "Short."), "garbage, not json")
+    article = _seo_generator(client).generate(_spec())
+    assert article.title == long_title  # still within the hard 255 limit
+
+
+def test_tighten_rejects_rewrite_that_is_still_too_long() -> None:
+    long_title = "T" * 80
+    client = _SequencedClient(
+        _two_part(long_title, "Short."),
+        json.dumps({"title": "U" * 61, "description": "Short."}),
+    )
+    assert _seo_generator(client).generate(_spec()).title == long_title

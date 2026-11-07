@@ -27,6 +27,7 @@ from markdown_it import MarkdownIt
 
 from app.campaign.models import DayState
 from app.generation.models import TAGS_MAX, TAGS_MIN, Article
+from app.validation.cli_check import check_article_commands
 
 __all__ = [
     "ValidationViolation",
@@ -136,9 +137,13 @@ _NON_PORTABLE_DIAGRAM_PATTERNS: tuple[re.Pattern[str], ...] = (
 class ContentValidator:
     """Runs deterministic publication gates and returns a ValidationResult."""
 
-    def __init__(self) -> None:
+    def __init__(self, require_cli_example: bool = False) -> None:
         # A strict CommonMark parser; used to confirm the body parses cleanly.
         self._markdown = MarkdownIt("commonmark")
+        # When True, every article must include at least one AWS CLI command and
+        # every ``aws`` command in it must verify against botocore's service
+        # definitions (real service, operation, flags, required parameters).
+        self._require_cli_example = require_cli_example
 
     def validate(
         self,
@@ -168,6 +173,8 @@ class ContentValidator:
         self._check_duplicate(existing_day_state, violations)
         self._check_non_portable_diagrams(article, violations)
         self._check_malformed_fences(article, violations)
+        if self._require_cli_example:
+            self._check_cli_examples(article, violations)
 
         return ValidationResult(
             is_valid=not violations, violations=tuple(violations)
@@ -407,6 +414,29 @@ class ContentValidator:
                     )
                     return
                 inside = False  # closing fence
+
+    def _check_cli_examples(
+        self, article: Article, violations: list[ValidationViolation]
+    ) -> None:
+        """Require at least one AWS CLI command, and that all of them verify."""
+        count, issues = check_article_commands(article.body_markdown)
+        if count == 0:
+            violations.append(
+                ValidationViolation(
+                    "CLI_EXAMPLE_MISSING",
+                    "body_markdown",
+                    "article has no AWS CLI example in a shell code block",
+                )
+            )
+            return
+        for issue in issues:
+            violations.append(
+                ValidationViolation(
+                    "CLI_COMMAND_INVALID",
+                    "body_markdown",
+                    f"command '{issue.command[:80]}' is invalid: {issue.reason}",
+                )
+            )
 
     # ------------------------------------------------------------------
     # Helpers

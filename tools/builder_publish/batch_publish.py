@@ -145,6 +145,7 @@ def _load_article(table: str, campaign_id: str, day: int, region: str) -> dict[s
     if not item:
         return {}
     return {
+        "state": item.get("day_state", {}).get("S", ""),
         "topic": item.get("topic", {}).get("S", ""),
         "title": item.get("title", {}).get("S", ""),
         "description": item.get("description", {}).get("S", ""),
@@ -327,6 +328,17 @@ def main(argv: list[str] | None = None) -> int:
                 if not article:
                     print(f"\n[day {day}] no article found; skipping.")
                     continue
+                if not str(article["title"]).strip() or not str(article["body_markdown"]).strip():
+                    # Never open an empty editor: the day exists but has no generated
+                    # content (e.g. rewound to PLANNED and not yet regenerated).
+                    print(
+                        f"\n[day {day}] has no generated content yet (state "
+                        f"{article['state']}). Generate it first:\n"
+                        f"  python tools/bootstrap_campaign.py --regenerate-from {day} "
+                        f"--through {day}"
+                    )
+                    stopped_reason = f"day {day} has no content to publish"
+                    break
 
                 print("\n" + "=" * 70)
                 print(f"[day {day}] {article['title']}")
@@ -375,6 +387,13 @@ def main(argv: list[str] | None = None) -> int:
 
                 created += 1
                 print(f"  filled title/description/body.")
+                # Builder Center's SEO recommendation: title <= 60, description <= 160.
+                t_len, d_len = len(str(article["title"])), len(str(article["description"]))
+                if t_len > 60 or d_len > 160:
+                    print(
+                        f"  SEO: title {t_len}/60, description {d_len}/160 chars - "
+                        "consider shortening in the editor before publishing."
+                    )
 
                 # Auto-stamp the checklist: the editor is now filled, so the
                 # BC-draft stage is a fact we can record. Publishing is still a
