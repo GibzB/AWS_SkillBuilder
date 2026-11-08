@@ -45,3 +45,6 @@ tags = {
 
 # Monthly account budget in USD; alerts go to notification_email. 0 disables it.
 monthly_budget_usd = 15
+
+# Room for generate + SEO tighten + one repair (billed per actual run time).
+lambda_timeout_seconds = 600

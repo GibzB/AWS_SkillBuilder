@@ -50,10 +50,10 @@ from app.common.errors import (
 )
 from app.common.metrics import MetricName, MetricsEmitter
 from app.generation.generator import ContentGenerator, ThreadTimeoutRunner, TimeoutRunner
-from app.generation.models import GenerationSpec
+from app.generation.models import Article, GenerationSpec
 from app.notify.notifier import NotificationContext, Notifier
 from app.publishing.adapter import PublicationResult, PublishingAdapter
-from app.validation.validator import ContentValidator
+from app.validation.validator import ContentValidator, ValidationResult
 
 __all__ = [
     "MAX_PUBLISH_ATTEMPTS",
@@ -241,22 +241,51 @@ class Orchestrator:
             campaign.campaign_id, day.day, current_state, DayState.GENERATING,
             self._clock.now_iso(),
         )
+        spec = GenerationSpec(
+            campaign_id=campaign.campaign_id,
+            day=day.day,
+            topic=day.topic,
+        )
         try:
-            article = self._generator.generate(
-                GenerationSpec(
-                    campaign_id=campaign.campaign_id,
-                    day=day.day,
-                    topic=day.topic,
-                )
-            )
+            article = self._generator.generate(spec)
         except GenerationError as error:
             return self._fail(
                 campaign, day, DayState.GENERATING, "generation", error.message
             )
 
         self._metrics.emit(MetricName.ARTICLES_GENERATED)
-        # Persist the generated article and move to GENERATED. CampaignDay has
-        # no learning_takeaway field, so persist the supported article fields.
+        self._persist_generated(campaign, day, article)
+
+        # --- Validation (Requirements 5.13, 5.14) ---------------------
+        existing = self._store.get_day(campaign.campaign_id, day.day)
+        existing_state = existing.day_state if existing else None
+        result = self._validator.validate(article, day.topic, existing_state)
+        if not result.is_valid:
+            repaired = self._try_repair(spec, article, result, day.topic, existing_state)
+            if repaired is not None:
+                article, result = repaired
+                self._persist_generated(campaign, day, article)
+        if not result.is_valid:
+            reason = "; ".join(v.message for v in result.violations)
+            return self._fail(
+                campaign, day, DayState.GENERATED, "validation", reason
+            )
+        self._store.update_day_state(
+            campaign.campaign_id, day.day, DayState.GENERATED, DayState.READY,
+            self._clock.now_iso(),
+        )
+
+        # --- Publication (Requirements 7, 9, 12) ----------------------
+        return self._publish(campaign, day, article)
+
+    def _persist_generated(
+        self, campaign: Campaign, day: CampaignDay, article: Article
+    ) -> None:
+        """Store the generated article with the day in GENERATED.
+
+        CampaignDay has no learning_takeaway field, so only the supported
+        article fields are persisted.
+        """
         self._store.put_day(
             CampaignDay(
                 campaign_id=campaign.campaign_id,
@@ -275,22 +304,37 @@ class Orchestrator:
             )
         )
 
-        # --- Validation (Requirements 5.13, 5.14) ---------------------
-        existing = self._store.get_day(campaign.campaign_id, day.day)
-        existing_state = existing.day_state if existing else None
-        result = self._validator.validate(article, day.topic, existing_state)
-        if not result.is_valid:
-            reason = "; ".join(v.message for v in result.violations)
-            return self._fail(
-                campaign, day, DayState.GENERATED, "validation", reason
-            )
-        self._store.update_day_state(
-            campaign.campaign_id, day.day, DayState.GENERATED, DayState.READY,
-            self._clock.now_iso(),
-        )
+    # Violations that a rewrite cannot fix (they are about state, not content).
+    _NOT_REPAIRABLE = frozenset({"DUPLICATE_PUBLICATION"})
 
-        # --- Publication (Requirements 7, 9, 12) ----------------------
-        return self._publish(campaign, day, article)
+    def _try_repair(
+        self,
+        spec: GenerationSpec,
+        article: Article,
+        result: ValidationResult,
+        topic: str,
+        existing_state: DayState | None,
+    ) -> tuple[Article, ValidationResult] | None:
+        """Give the generator ONE chance to fix a rejected draft.
+
+        Only content problems are repairable. The revised draft must pass the
+        same deterministic validation; otherwise None is returned and the
+        original failure stands. Generators without a ``revise`` method (test
+        fakes) are skipped.
+        """
+        if any(v.code in self._NOT_REPAIRABLE for v in result.violations):
+            return None
+        revise = getattr(self._generator, "revise", None)
+        if not callable(revise):
+            return None
+        try:
+            revised = revise(spec, article, [v.message for v in result.violations])
+        except GenerationError:
+            return None
+        revised_result = self._validator.validate(revised, topic, existing_state)
+        if not revised_result.is_valid:
+            return None
+        return revised, revised_result
 
     # ------------------------------------------------------------------
     # Publication with retry / backoff / verify / fail-safe

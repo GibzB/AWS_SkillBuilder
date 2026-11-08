@@ -455,3 +455,79 @@ def test_missing_topic_ends_without_publishing() -> None:
     assert result.outcome is ExecutionOutcome.MISSING_TOPIC
     assert pub.calls == 0
     assert store.get_day(cid, 1).day_state is DayState.PLANNED  # type: ignore[union-attr]
+
+
+# ----------------------------------------------------------------------
+# One-shot repair of a draft rejected by validation
+# ----------------------------------------------------------------------
+
+
+class RevisingGenerator(FakeGenerator):
+    """Generates a 'bad' draft, then a 'good' one when asked to revise."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.revise_calls: list[list[str]] = []
+
+    def revise(self, spec: object, draft: Article, problems: list[str]) -> Article:
+        self.revise_calls.append(problems)
+        return replace(draft, title="FIXED " + draft.title)
+
+
+class TitleMustBeFixedValidator:
+    """Rejects any article whose title does not start with 'FIXED'."""
+
+    def __init__(self, code: str = "CLI_COMMAND_INVALID") -> None:
+        self._code = code
+
+    def validate(
+        self, article: object, approved_topic: str, existing: object
+    ) -> ValidationResult:
+        if str(getattr(article, "title", "")).startswith("FIXED"):
+            return ValidationResult(is_valid=True, violations=())
+        return ValidationResult(
+            is_valid=False,
+            violations=(ValidationViolation(self._code, "body_markdown", "bad aws command"),),
+        )
+
+
+def test_rejected_draft_is_repaired_once_and_published() -> None:
+    client = FakeDynamoDBClient()
+    store, manager, cid = _seed_campaign(client, ["IAM"], CampaignState.RUNNING)
+    gen = RevisingGenerator()
+    orch = _orchestrator(
+        store, manager, gen, TitleMustBeFixedValidator(),
+        ScriptedPublisher([PublicationResult.success("https://mock/a")]),
+    )
+    result = orch.execute(cid)
+    assert result.outcome is ExecutionOutcome.PUBLISHED
+    assert gen.revise_calls == [["bad aws command"]]
+    stored = store.get_day(cid, 1)
+    assert stored is not None and stored.title.startswith("FIXED")
+
+
+def test_repair_that_still_fails_records_failure() -> None:
+    class StubbornGenerator(RevisingGenerator):
+        def revise(self, spec: object, draft: Article, problems: list[str]) -> Article:
+            self.revise_calls.append(problems)
+            return draft  # no improvement
+
+    client = FakeDynamoDBClient()
+    store, manager, cid = _seed_campaign(client, ["IAM"], CampaignState.RUNNING)
+    gen = StubbornGenerator()
+    orch = _orchestrator(store, manager, gen, TitleMustBeFixedValidator(), ScriptedPublisher([]))
+    result = orch.execute(cid)
+    assert result.outcome is ExecutionOutcome.FAILED
+    assert len(gen.revise_calls) == 1  # exactly one repair attempt
+
+
+def test_duplicate_publication_is_not_sent_for_repair() -> None:
+    client = FakeDynamoDBClient()
+    store, manager, cid = _seed_campaign(client, ["IAM"], CampaignState.RUNNING)
+    gen = RevisingGenerator()
+    orch = _orchestrator(
+        store, manager, gen, TitleMustBeFixedValidator("DUPLICATE_PUBLICATION"),
+        ScriptedPublisher([]),
+    )
+    assert orch.execute(cid).outcome is ExecutionOutcome.FAILED
+    assert gen.revise_calls == []

@@ -151,8 +151,45 @@ class ContentGenerator:
         output as a generation failure (Requirements 4.3, 4.6). No article is
         produced on any failure.
         """
-        prompt = self.build_prompt(spec)
+        return self._generate_from_prompt(self.build_prompt(spec), spec)
 
+    def revise(
+        self, spec: GenerationSpec, draft: Article, problems: list[str]
+    ) -> Article:
+        """Regenerate ``draft`` once, telling the model exactly what failed.
+
+        Used by the orchestrator when deterministic validation rejects an
+        article (for example an AWS CLI command missing a required option). The
+        model sees the full original instructions, its previous draft, and the
+        list of failed checks, and returns a complete corrected response in the
+        same two-part format. Raises :class:`GenerationError` like ``generate``.
+        """
+        header = json.dumps(
+            {
+                "title": draft.title,
+                "description": draft.description,
+                "tags": list(draft.tags),
+                "learning_takeaway": draft.learning_takeaway,
+            }
+        )
+        issues = "\n".join(f"- {problem}" for problem in problems)
+        revision = (
+            "\n\n# Revision required\n\n"
+            "Your previous draft (between the markers below) failed these "
+            f"automated checks:\n{issues}\n\n"
+            "Fix every problem. If an AWS CLI command is invalid, replace it with "
+            "a different command you are sure is correct, including every "
+            "required option, rather than guessing flags. Keep everything that "
+            "was already fine. Return the COMPLETE corrected response in the same "
+            "two-part format: the metadata JSON, the ---BODY--- line, then the "
+            "body.\n\n"
+            f"=== PREVIOUS DRAFT START ===\n{header}\n---BODY---\n"
+            f"{draft.body_markdown}\n=== PREVIOUS DRAFT END ===\n"
+        )
+        return self._generate_from_prompt(self.build_prompt(spec) + revision, spec)
+
+    def _generate_from_prompt(self, prompt: str, spec: GenerationSpec) -> Article:
+        """Invoke the model under the timeout, then parse and SEO-tighten."""
         try:
             raw = self._timeout_runner.run(
                 self._timeout_seconds,

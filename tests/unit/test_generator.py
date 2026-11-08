@@ -344,3 +344,17 @@ def test_tighten_rejects_rewrite_that_is_still_too_long() -> None:
         json.dumps({"title": "U" * 61, "description": "Short."}),
     )
     assert _seo_generator(client).generate(_spec()).title == long_title
+
+
+def test_revise_prompt_carries_problems_and_previous_draft() -> None:
+    client = _SequencedClient(
+        _two_part("Learning IAM", "A short note."),
+        _two_part("Learning IAM well", "A better note."),
+    )
+    gen = _seo_generator(client)
+    draft = gen.generate(_spec())
+    revised = gen.revise(_spec(), draft, ["command 'aws ssm x' is invalid: missing --instance-id"])
+    assert revised.title == "Learning IAM well"
+    prompt = client.prompts[1]
+    assert "missing --instance-id" in prompt
+    assert "=== PREVIOUS DRAFT START ===" in prompt and "One thing I learned" in prompt
