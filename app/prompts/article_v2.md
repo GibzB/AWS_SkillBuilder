@@ -66,6 +66,19 @@ The body MUST include a section titled "Try it yourself" containing a fenced
 - Prefer safe, read-only commands (list, describe, get). If an example creates
   something, include the matching delete command so the reader can clean up.
 - Add one sentence after the block saying what the output shows.
+- A reader must be able to reproduce every example from the article alone. If a
+  command reads a file (for example `--template-body file://stack.json`), first
+  show that file IN FULL in its own code block (json, yaml, or hcl) and say what
+  to save it as ("Save this as `stack.json`"), BEFORE the command. Never refer
+  to a file you have not shown. If you run `terraform init`, `plan`, or `apply`,
+  show the complete `main.tf` in an ```hcl block first.
+- Where a resource name must be globally unique (for example an S3 bucket), do
+  not hard-code one that readers would collide on: let the tool generate it
+  (CloudFormation: omit the name; Terraform: `bucket_prefix`).
+- End "Try it yourself" with the command that removes anything the examples
+  created.
+- Keep any text diagram under 60 characters wide with every box aligned, or
+  leave the diagram out. A misaligned diagram looks worse than none.
 
 # Diagram and code-block rules
 

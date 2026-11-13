@@ -135,3 +135,43 @@ def test_bedrock_client_uses_converse_and_joins_text_blocks() -> None:
     assert out == "part one part two"
     assert runtime.kwargs["modelId"] == "eu.anthropic.claude-sonnet-4-6"
     assert runtime.kwargs["inferenceConfig"] == {"maxTokens": 500, "temperature": 0.2}
+
+
+# -- examples must be reproducible from the article alone ---------------------
+
+from app.validation.cli_check import find_unshown_files, terraform_config_missing  # noqa: E402
+
+_CFN_CMD = (
+    "```bash\naws cloudformation create-stack --stack-name demo "
+    "--template-body file://s3-bucket-template.json\n```\n"
+)
+
+
+def test_file_reference_without_contents_is_flagged() -> None:
+    assert find_unshown_files("Intro.\n\n" + _CFN_CMD) == ["s3-bucket-template.json"]
+
+
+def test_file_reference_with_contents_shown_is_accepted() -> None:
+    md = (
+        "Save this as `s3-bucket-template.json`:\n\n```json\n"
+        '{"Resources": {"B": {"Type": "AWS::S3::Bucket"}}}\n```\n\n' + _CFN_CMD
+    )
+    assert find_unshown_files(md) == []
+
+
+def test_binary_fileb_reference_is_not_checked() -> None:
+    md = "```bash\naws lambda update-function-code --function-name f --zip-file fileb://f.zip\n```\n"
+    assert find_unshown_files(md) == []
+
+
+def test_terraform_commands_without_config_are_flagged() -> None:
+    bare = "```bash\nterraform init\nterraform apply -auto-approve\n```\n"
+    assert terraform_config_missing(bare)
+    shown = '```hcl\nresource "aws_s3_bucket" "b" {}\n```\n' + bare
+    assert not terraform_config_missing(shown)
+
+
+def test_validator_reports_unshown_file_and_missing_terraform_config() -> None:
+    body = "# Amazon S3\n\nAbout Amazon S3.\n\n" + _CFN_CMD + "\n```bash\nterraform apply\n```\n"
+    codes = _codes(_article(body), require=True)
+    assert {"REFERENCED_FILE_MISSING", "TERRAFORM_CONFIG_MISSING"} <= codes

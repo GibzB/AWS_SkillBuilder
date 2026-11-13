@@ -27,7 +27,11 @@ from markdown_it import MarkdownIt
 
 from app.campaign.models import DayState
 from app.generation.models import TAGS_MAX, TAGS_MIN, Article
-from app.validation.cli_check import check_article_commands
+from app.validation.cli_check import (
+    check_article_commands,
+    find_unshown_files,
+    terraform_config_missing,
+)
 
 __all__ = [
     "ValidationViolation",
@@ -435,6 +439,24 @@ class ContentValidator:
                     "CLI_COMMAND_INVALID",
                     "body_markdown",
                     f"command '{issue.command[:80]}' is invalid: {issue.reason}",
+                )
+            )
+        for name in find_unshown_files(article.body_markdown):
+            violations.append(
+                ValidationViolation(
+                    "REFERENCED_FILE_MISSING",
+                    "body_markdown",
+                    f"a command reads file '{name}' but the article never shows its "
+                    "contents; add a code block with the full file and say what to "
+                    "save it as, before the command",
+                )
+            )
+        if terraform_config_missing(article.body_markdown):
+            violations.append(
+                ValidationViolation(
+                    "TERRAFORM_CONFIG_MISSING",
+                    "body_markdown",
+                    "article runs terraform commands but shows no ```hcl config block",
                 )
             )
 

@@ -130,6 +130,38 @@ def check_command(command: str) -> str | None:
     return None
 
 
+def find_unshown_files(markdown: str) -> list[str]:
+    """Return local files an ``aws`` command reads via ``file://`` but the article never shows.
+
+    A reader can only reproduce a command like ``--template-body
+    file://stack.json`` if the article also shows that file. The filename must
+    therefore appear at least twice in the body: once in the command and at
+    least once where the file is introduced (for example "Save this as
+    ``stack.json``" above its code block). Binary ``fileb://`` inputs (such as a
+    zip) cannot be shown as text and are not checked.
+    """
+    names: list[str] = []
+    for command in extract_aws_commands(markdown):
+        for match in re.finditer(r"file://([^\s'\"]+)", command):
+            name = match.group(1).rsplit("/", 1)[-1]
+            if name and name not in names:
+                names.append(name)
+    return [name for name in names if markdown.count(name) < 2]
+
+
+_TERRAFORM_COMMAND = re.compile(
+    r"(?m)^\s*(?:[$>]\s*)?terraform\s+(?:init|plan|apply|destroy)\b"
+)
+_TERRAFORM_CONFIG_FENCE = re.compile(r"```\s*(?:hcl|terraform|tf)\b", re.IGNORECASE)
+
+
+def terraform_config_missing(markdown: str) -> bool:
+    """True if the article runs ``terraform`` commands but shows no Terraform config."""
+    return bool(_TERRAFORM_COMMAND.search(markdown)) and not _TERRAFORM_CONFIG_FENCE.search(
+        markdown
+    )
+
+
 def check_article_commands(markdown: str) -> tuple[int, list[CliIssue]]:
     """Return (number of aws commands found, list of issues)."""
     commands = extract_aws_commands(markdown)
