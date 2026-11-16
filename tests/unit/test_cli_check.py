@@ -175,3 +175,62 @@ def test_validator_reports_unshown_file_and_missing_terraform_config() -> None:
     body = "# Amazon S3\n\nAbout Amazon S3.\n\n" + _CFN_CMD + "\n```bash\nterraform apply\n```\n"
     codes = _codes(_article(body), require=True)
     assert {"REFERENCED_FILE_MISSING", "TERRAFORM_CONFIG_MISSING"} <= codes
+
+
+# -- options added by the AWS CLI itself (not in the API model) ---------------
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "aws lambda create-function --function-name f --runtime python3.12 "
+        "--role arn:aws:iam::123456789012:role/r --handler app.handler --zip-file fileb://f.zip",
+        "aws ec2 run-instances --image-id ami-0abcdef1234567890 --count 1 --instance-type t3.micro",
+        "aws ec2 authorize-security-group-ingress --group-id sg-0123456789abcdef0 "
+        "--protocol tcp --port 22 --cidr 10.0.0.0/16",
+        "aws eks update-kubeconfig --name demo",
+        "aws ecr get-login-password --region eu-west-1",
+        "aws configure list",
+        "aws deploy list-applications",
+    ],
+)
+def test_cli_customizations_are_accepted(command: str) -> None:
+    assert check_command(command) is None
+
+
+def test_customization_does_not_excuse_other_missing_options() -> None:
+    reason = check_command("aws lambda create-function --function-name f --zip-file fileb://f.zip") or ""
+    assert "--role" in reason and "--code" not in reason
+
+
+def test_customization_flags_do_not_leak_to_other_commands() -> None:
+    assert "--zip-file" in (check_command("aws lambda list-functions --zip-file x") or "")
+
+
+# -- commands a beginner cannot run as written --------------------------------
+
+from app.validation.cli_check import find_unreproducible_commands  # noqa: E402
+
+
+def test_dummy_account_arn_and_binary_package_are_flagged() -> None:
+    md = (
+        "```bash\n"
+        "aws lambda create-function --function-name f --runtime python3.12 "
+        "--role arn:aws:iam::123456789012:role/r --handler h --zip-file fileb://f.zip\n"
+        "aws sns publish --topic-arn arn:aws:sns:eu-west-1:123456789012:t --message hi\n"
+        "```\n"
+    )
+    assert len(find_unreproducible_commands(md)) == 2
+
+
+def test_read_only_commands_are_not_flagged() -> None:
+    md = "```bash\naws lambda list-functions\naws sts get-caller-identity\n```\n"
+    assert find_unreproducible_commands(md) == []
+
+
+def test_validator_reports_not_reproducible() -> None:
+    body = (
+        "# Amazon S3\n\nAbout Amazon S3.\n\n```bash\n"
+        "aws iam get-role --role-name x --cli-input-json arn:aws:iam::123456789012:role/r\n```\n"
+    )
+    assert "CLI_NOT_REPRODUCIBLE" in _codes(_article(body), require=True)

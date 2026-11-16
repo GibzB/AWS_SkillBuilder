@@ -106,6 +106,60 @@ def _rewind(ddb: Any, table: str, campaign: str, from_day: int, total: int) -> N
     print(f"rewind : days {from_day}..{total} set to PLANNED; campaign set to RUNNING")
 
 
+def _extend(ddb: Any, table: str, campaign: str, new_total: int, topics: list[str]) -> None:
+    """Lengthen the campaign to ``new_total`` days.
+
+    ``topics`` are the topics of the LAST ``len(topics)`` days, in day order. A day
+    that already exists must still be PLANNED (its topic is replaced); days beyond
+    the current length are appended as PLANNED. Published or in-flight days are
+    never touched, and the campaign can only grow.
+    """
+    from dataclasses import replace
+
+    from app.campaign.idempotency import derive_idempotency_key
+    from app.campaign.models import CampaignDay, DayState
+    from app.campaign.store import CampaignStore
+
+    store = CampaignStore(ddb, table)
+    current = store.get_campaign(campaign)
+    if current is None:
+        raise SystemExit(f"campaign {campaign!r} not found")
+    if new_total < current.total_days:
+        raise SystemExit(f"--extend-to {new_total} would shrink the campaign ({current.total_days} days)")
+    first = new_total - len(topics) + 1
+    if first > current.total_days + 1:
+        raise SystemExit(
+            f"topics start at day {first} but the campaign ends at day {current.total_days}; "
+            "supply one topic for every new day"
+        )
+    now = _ts()
+    plan: list[tuple[int, str]] = []
+    for offset, topic in enumerate(topics):
+        day = first + offset
+        existing = store.get_day(campaign, day) if day <= current.total_days else None
+        if existing is not None and existing.day_state is not DayState.PLANNED:
+            raise SystemExit(f"day {day} is {existing.day_state.value}; only PLANNED days can change")
+        plan.append((day, topic))
+    for day, topic in plan:
+        existing = store.get_day(campaign, day) if day <= current.total_days else None
+        if existing is not None:
+            store.put_day(replace(existing, topic=topic, updated_at=now))
+        else:
+            store.put_day(
+                CampaignDay(
+                    campaign_id=campaign,
+                    day=day,
+                    day_state=DayState.PLANNED,
+                    updated_at=now,
+                    topic=topic,
+                    idempotency_key=derive_idempotency_key(campaign, day),
+                )
+            )
+        print(f"extend : day {day:>2} -> {topic}")
+    store.put_campaign(replace(current, total_days=new_total, updated_at=now))
+    print(f"extend : campaign now {new_total} days (was {current.total_days})")
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Create + run a campaign end to end.")
     p.add_argument("--campaign", default="aws-learning-21")
@@ -138,9 +192,26 @@ def main() -> int:
         help="Only generate up to day N this run (default: all days). Rewound days "
         "after N stay PLANNED and the daily schedule generates one each morning.",
     )
+    p.add_argument(
+        "--extend-to",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Lengthen the campaign to N days. Use --topic once per day for the LAST "
+        "days (ending at N); days that already exist must still be PLANNED and just "
+        "get their topic replaced, new days are appended. Does not generate anything.",
+    )
+    p.add_argument(
+        "--topic",
+        action="append",
+        default=[],
+        help="Topic for one extended day (repeat; in day order, ending at --extend-to).",
+    )
     args = p.parse_args()
-    if args.regenerate_from:
+    if args.regenerate_from or args.extend_to:
         args.skip_create = True
+    if args.extend_to and not args.topic:
+        p.error("--extend-to needs at least one --topic")
     through = args.through or args.days
 
     function = f"aws-builder-{args.campaign}-orchestrator"
@@ -158,6 +229,11 @@ def main() -> int:
 
     if args.regenerate_from:
         _rewind(ddb, table, args.campaign, args.regenerate_from, args.days)
+
+    if args.extend_to:
+        _extend(ddb, table, args.campaign, args.extend_to, args.topic)
+        if not args.through:
+            return 0
 
     if not args.skip_create:
         if not args.email:

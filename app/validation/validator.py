@@ -29,6 +29,7 @@ from app.campaign.models import DayState
 from app.generation.models import TAGS_MAX, TAGS_MIN, Article
 from app.validation.cli_check import (
     check_article_commands,
+    find_unreproducible_commands,
     find_unshown_files,
     terraform_config_missing,
 )
@@ -449,6 +450,16 @@ class ContentValidator:
                     f"a command reads file '{name}' but the article never shows its "
                     "contents; add a code block with the full file and say what to "
                     "save it as, before the command",
+                )
+            )
+        for command in find_unreproducible_commands(article.body_markdown):
+            violations.append(
+                ValidationViolation(
+                    "CLI_NOT_REPRODUCIBLE",
+                    "body_markdown",
+                    f"command '{command[:80]}' needs an account-specific ARN or a "
+                    "package file the reader does not have; replace it with a "
+                    "read-only command (list, describe, get) that runs as written",
                 )
             )
         if terraform_config_missing(article.body_markdown):

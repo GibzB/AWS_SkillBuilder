@@ -65,6 +65,11 @@ The body MUST include a section titled "Try it yourself" containing a fenced
   curly-brace templates; placeholders are rejected.
 - Prefer safe, read-only commands (list, describe, get). If an example creates
   something, include the matching delete command so the reader can clean up.
+- Only use a command a beginner can run as written. Do NOT use commands that need
+  an IAM role ARN, an account ID, or a zip or package file the reader does not
+  have (for example `aws lambda create-function`). Do not name runtimes, engine
+  versions, or AMI IDs that may be deprecated; use a read-only command that
+  inspects the service instead (for example `aws lambda list-functions`).
 - Add one sentence after the block saying what the output shows.
 - A reader must be able to reproduce every example from the article alone. If a
   command reads a file (for example `--template-body file://stack.json`), first

@@ -37,6 +37,35 @@ _CUSTOM_COMMANDS: dict[str, set[str]] = {
     "cloudformation": {"deploy", "package"},
     "logs": {"tail", "start-live-tail"},
     "configure": {"get", "set", "list", "list-profiles"},
+    "eks": {"update-kubeconfig", "get-token"},
+    "ecr": {"get-login-password", "get-login"},
+    "rds": {"generate-db-auth-token"},
+    "cloudtrail": {"validate-logs"},
+    "emr": {"create-cluster", "add-steps", "terminate-clusters", "ssh", "put", "get", "socks"},
+    "codeartifact": {"login"},
+}
+
+# CLI services that are entirely client-side customizations (no botocore model).
+_CUSTOM_SERVICES = {"configure", "deploy", "history", "help"}
+
+# Options the AWS CLI adds on top of the API model for specific commands. They
+# live in the CLI's own "customizations", not in botocore, so the API model alone
+# would wrongly reject them. Keyed by (botocore service, cli command).
+_SECGROUP_FLAGS = {"protocol", "port", "cidr", "source-group", "group-owner"}
+_EXTRA_FLAGS: dict[tuple[str, str], set[str]] = {
+    ("lambda", "create-function"): {"zip-file"},
+    ("ec2", "run-instances"): {"count"},
+    ("ec2", "authorize-security-group-ingress"): _SECGROUP_FLAGS,
+    ("ec2", "authorize-security-group-egress"): _SECGROUP_FLAGS,
+    ("ec2", "revoke-security-group-ingress"): _SECGROUP_FLAGS,
+    ("ec2", "revoke-security-group-egress"): _SECGROUP_FLAGS,
+}
+
+# Required API parameters that a customization lets you satisfy another way:
+# {(service, command): {required option: options that can replace it}}.
+_REQUIRED_ALTERNATIVES: dict[tuple[str, str], dict[str, set[str]]] = {
+    ("lambda", "create-function"): {"code": {"zip-file"}},
+    ("ec2", "run-instances"): {"min-count": {"count"}, "max-count": {"count"}},
 }
 
 # Options accepted on every command.
@@ -82,6 +111,8 @@ def check_command(command: str) -> str | None:
         tokens = shlex.split(command, comments=True)
     except ValueError as error:
         return f"cannot parse command ({error})"
+    if len(tokens) >= 2 and tokens[0] == "aws" and tokens[1] in _CUSTOM_SERVICES:
+        return None
     if len(tokens) < 3 or tokens[0] != "aws":
         return "expected 'aws <service> <command>'"
 
@@ -108,6 +139,7 @@ def check_command(command: str) -> str | None:
     members = shape.members if shape is not None else {}
     valid = {xform_name(m, "-") for m in members}
     valid |= {f"no-{name}" for name in valid}  # boolean negations
+    valid |= _EXTRA_FLAGS.get((service, op_cli), set())
     required = {xform_name(m, "-") for m in (shape.required_members if shape else [])}
 
     # Only '--flag' tokens are inspected. Values and the few trailing positional
@@ -124,7 +156,12 @@ def check_command(command: str) -> str | None:
 
     skeleton = {"cli-input-json", "cli-input-yaml", "generate-cli-skeleton"} & given
     if not skeleton:
-        missing = sorted(required - given)
+        alternatives = _REQUIRED_ALTERNATIVES.get((service, op_cli), {})
+        missing = sorted(
+            name
+            for name in required - given
+            if not (alternatives.get(name, set()) & given)
+        )
         if missing:
             return "missing required option(s): " + ", ".join(f"--{m}" for m in missing)
     return None
@@ -147,6 +184,25 @@ def find_unshown_files(markdown: str) -> list[str]:
             if name and name not in names:
                 names.append(name)
     return [name for name in names if markdown.count(name) < 2]
+
+
+_ACCOUNT_ARN = re.compile(r"arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:")
+
+
+def find_unreproducible_commands(markdown: str) -> list[str]:
+    """Return commands a beginner cannot run as written.
+
+    Two patterns make an example impossible to reproduce even when the command is
+    syntactically valid: an ARN containing a 12-digit account ID (the model writes
+    a dummy one such as 123456789012, so the reader must guess the real value) and
+    a ``fileb://`` binary package (a zip cannot be shown in the article). Articles
+    should use read-only commands, or commands whose inputs are all shown.
+    """
+    return [
+        command
+        for command in extract_aws_commands(markdown)
+        if _ACCOUNT_ARN.search(command) or "fileb://" in command
+    ]
 
 
 _TERRAFORM_COMMAND = re.compile(
