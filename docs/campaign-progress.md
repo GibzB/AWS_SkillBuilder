@@ -43,7 +43,7 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 18 | AWS security fundamentals | ✅ | ✅ | ✅ | 🔥 13 | published live |
 | 19 | AWS cost optimization | ✅ | ✅ | ✅ | 🔥 14 | published live (hand-edited: removed invented savings claim) |
 | 20 | Serverless architecture patterns | ✅ | ✅ | ✅ | 🔥 15 | published live |
-| 21 | Amazon SQS and decoupling with queues | ✅ | ⬜ | ⬜ | · broken | NEXT — regenerated after the 09:00 run failed on placeholders; draft tonight, publish 18 Nov |
+| 21 | Amazon SQS and decoupling with queues | ✅ | ✅ | ⬜ | · broken | NEXT — regenerated after the 09:00 run failed on placeholders; draft tonight, publish 18 Nov |
 | 22 | AWS Step Functions | ⬜ | ⬜ | ⬜ | · broken | added |
 | 23 | Amazon CloudFront and content delivery | ⬜ | ⬜ | ⬜ | · broken | added |
 | 24 | AWS KMS and encryption at rest | ⬜ | ⬜ | ⬜ | · broken | added |
