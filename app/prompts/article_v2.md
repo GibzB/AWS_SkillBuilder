@@ -65,6 +65,12 @@ The body MUST include a section titled "Try it yourself" containing a fenced
   curly-brace templates; placeholders are rejected.
 - Prefer safe, read-only commands (list, describe, get). If an example creates
   something, include the matching delete command so the reader can clean up.
+- When a later command needs a value printed by an earlier one (a queue URL, a
+  receipt handle, a resource ID), capture it in a shell variable with --query and
+  --output text, for example
+  `QUEUE_URL=$(aws sqs create-queue --queue-name learning-queue --query QueueUrl --output text)`,
+  then use "$QUEUE_URL". NEVER write a placeholder in angle brackets, and NEVER
+  write a dummy 12-digit account ID such as 123456789012 in a URL or ARN.
 - Only use a command a beginner can run as written. Do NOT use commands that need
   an IAM role ARN, an account ID, or a zip or package file the reader does not
   have (for example `aws lambda create-function`). Do not name runtimes, engine

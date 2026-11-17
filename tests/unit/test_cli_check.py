@@ -234,3 +234,37 @@ def test_validator_reports_not_reproducible() -> None:
         "aws iam get-role --role-name x --cli-input-json arn:aws:iam::123456789012:role/r\n```\n"
     )
     assert "CLI_NOT_REPRODUCIBLE" in _codes(_article(body), require=True)
+
+
+# -- chaining commands without placeholders -----------------------------------
+
+
+def test_captured_variable_commands_are_extracted_and_checked() -> None:
+    md = (
+        "```bash\n"
+        "QUEUE_URL=$(aws sqs create-queue --queue-name learning-queue --query QueueUrl --output text)\n"
+        'aws sqs send-message --queue-url "$QUEUE_URL" --message-body hello\n'
+        'aws sqs delete-queue --queue-url "$QUEUE_URL"\n'
+        "```\n"
+    )
+    commands = extract_aws_commands(md)
+    assert len(commands) == 3
+    assert all(check_command(c) is None for c in commands)
+    assert find_unreproducible_commands(md) == []
+
+
+def test_dummy_account_id_in_queue_url_is_not_reproducible() -> None:
+    md = (
+        "```bash\naws sqs send-message --queue-url "
+        "https://sqs.us-east-1.amazonaws.com/123456789012/q --message-body hi\n```\n"
+    )
+    assert len(find_unreproducible_commands(md)) == 1
+
+
+def test_placeholder_violation_quotes_the_offending_text() -> None:
+    body = "# Amazon S3\n\nAbout Amazon S3.\n\n```bash\naws s3api delete-object --bucket b --key <object-key>\n```\n"
+    result = ContentValidator(require_cli_example=True).validate(
+        _article(body), "Amazon S3", DayState.READY
+    )
+    message = next(v.message for v in result.violations if v.code == "PLACEHOLDER_PRESENT")
+    assert "<object-key>" in message

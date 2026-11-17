@@ -5,7 +5,7 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
-> 🔥 **Current posting streak: Day 14** — keep publishing consecutive days to extend the chain.
+> 🔥 **Current posting streak: Day 15** — keep publishing consecutive days to extend the chain.
 > chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
 > day 6 was skipped.) Update this number each time you publish.
 
@@ -42,8 +42,8 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 17 | Infrastructure as Code (Terraform/CloudFormation) | ✅ | ✅ | ✅ | 🔥 12 | published live (regenerated once; first run omitted its template file) |
 | 18 | AWS security fundamentals | ✅ | ✅ | ✅ | 🔥 13 | published live |
 | 19 | AWS cost optimization | ✅ | ✅ | ✅ | 🔥 14 | published live (hand-edited: removed invented savings claim) |
-| 20 | Serverless architecture patterns | ✅ | ✅ | ⬜ | · broken | NEXT — generated; draft tonight, publish 17 Nov |
-| 21 | Amazon SQS and decoupling with queues | ⬜ | ⬜ | ⬜ | · broken | added to extend the streak to 21 |
+| 20 | Serverless architecture patterns | ✅ | ✅ | ✅ | 🔥 15 | published live |
+| 21 | Amazon SQS and decoupling with queues | ✅ | ⬜ | ⬜ | · broken | NEXT — regenerated after the 09:00 run failed on placeholders; draft tonight, publish 18 Nov |
 | 22 | AWS Step Functions | ⬜ | ⬜ | ⬜ | · broken | added |
 | 23 | Amazon CloudFront and content delivery | ⬜ | ⬜ | ⬜ | · broken | added |
 | 24 | AWS KMS and encryption at rest | ⬜ | ⬜ | ⬜ | · broken | added |

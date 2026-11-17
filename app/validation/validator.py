@@ -285,14 +285,21 @@ class ContentValidator:
         self, article: Article, violations: list[ValidationViolation]
     ) -> None:
         haystack = f"{article.title}\n{article.description}\n{article.body_markdown}"
-        if any(pattern.search(haystack) for pattern in _PLACEHOLDER_PATTERNS):
-            violations.append(
-                ValidationViolation(
-                    "PLACEHOLDER_PRESENT",
-                    "body_markdown",
-                    "content contains placeholder text",
+        for pattern in _PLACEHOLDER_PATTERNS:
+            match = pattern.search(haystack)
+            if match is not None:
+                # Quote the offending text so a repair attempt knows exactly what
+                # to replace (a bare "contains placeholder text" is not actionable).
+                violations.append(
+                    ValidationViolation(
+                        "PLACEHOLDER_PRESENT",
+                        "body_markdown",
+                        f"content contains placeholder text: '{match.group(0)[:60]}'; "
+                        "capture real values from earlier commands with a shell "
+                        "variable and --query instead",
+                    )
                 )
-            )
+                return
 
     def _check_fabricated_execution(
         self, article: Article, violations: list[ValidationViolation]

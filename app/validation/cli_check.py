@@ -100,6 +100,10 @@ def extract_aws_commands(markdown: str) -> list[str]:
         for line in joined.splitlines():
             line = line.strip()
             line = re.sub(r"^[$>]\s*", "", line)
+            # Capture form: NAME=$(aws ... --query X --output text)
+            captured = re.match(r"^[A-Za-z_]\w*=\"?\$\((aws .*)\)\"?\s*$", line)
+            if captured:
+                line = captured.group(1)
             if line.startswith("aws "):
                 commands.append(line)
     return commands
@@ -186,7 +190,9 @@ def find_unshown_files(markdown: str) -> list[str]:
     return [name for name in names if markdown.count(name) < 2]
 
 
-_ACCOUNT_ARN = re.compile(r"arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:\d{12}:")
+# A 12-digit run is an AWS account ID (ARNs, queue URLs, ECR registries, ...).
+# Articles use dummy ones such as 123456789012 that a reader cannot reproduce.
+_ACCOUNT_ARN = re.compile(r"(?<!\d)\d{12}(?!\d)")
 
 
 def find_unreproducible_commands(markdown: str) -> list[str]:
