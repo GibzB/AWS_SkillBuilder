@@ -44,7 +44,7 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 19 | AWS cost optimization | ✅ | ✅ | ✅ | 🔥 14 | published live (hand-edited: removed invented savings claim) |
 | 20 | Serverless architecture patterns | ✅ | ✅ | ✅ | 🔥 15 | published live |
 | 21 | Amazon SQS and decoupling with queues | ✅ | ✅ | ✅ | 🔥 16 | published live (regenerated after a placeholder failure; example run end to end by hand) |
-| 22 | AWS Step Functions | ✅ | ⬜ | ⬜ | · broken | NEXT — generated 18 Nov; draft tonight, publish 19 Nov |
+| 22 | AWS Step Functions | ✅ | ✅ | ⬜ | · broken | NEXT — generated 18 Nov; draft tonight, publish 19 Nov |
 | 23 | Amazon CloudFront and content delivery | ⬜ | ⬜ | ⬜ | · broken | added |
 | 24 | AWS KMS and encryption at rest | ⬜ | ⬜ | ⬜ | · broken | added |
 | 25 | Amazon Route 53 and DNS fundamentals | ⬜ | ⬜ | ⬜ | · broken | added |
