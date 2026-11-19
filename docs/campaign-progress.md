@@ -5,7 +5,7 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
-> 🔥 **Current posting streak: Day 16** — keep publishing consecutive days to extend the chain.
+> 🔥 **Current posting streak: Day 17** — keep publishing consecutive days to extend the chain.
 > chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
 > day 6 was skipped.) Update this number each time you publish.
 
@@ -44,8 +44,8 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 19 | AWS cost optimization | ✅ | ✅ | ✅ | 🔥 14 | published live (hand-edited: removed invented savings claim) |
 | 20 | Serverless architecture patterns | ✅ | ✅ | ✅ | 🔥 15 | published live |
 | 21 | Amazon SQS and decoupling with queues | ✅ | ✅ | ✅ | 🔥 16 | published live (regenerated after a placeholder failure; example run end to end by hand) |
-| 22 | AWS Step Functions | ✅ | ✅ | ⬜ | · broken | NEXT — generated 18 Nov; draft tonight, publish 19 Nov |
-| 23 | Amazon CloudFront and content delivery | ⬜ | ⬜ | ⬜ | · broken | added |
+| 22 | AWS Step Functions | ✅ | ✅ | ✅ | 🔥 17 | published live |
+| 23 | Amazon CloudFront and content delivery | ✅ | ⬜ | ⬜ | · broken | NEXT — generated 19 Nov; draft tonight, publish 20 Nov |
 | 24 | AWS KMS and encryption at rest | ⬜ | ⬜ | ⬜ | · broken | added |
 | 25 | Amazon Route 53 and DNS fundamentals | ⬜ | ⬜ | ⬜ | · broken | added |
 | 26 | Lessons learned: connecting the AWS fundamentals | ⬜ | ⬜ | ⬜ | · broken | finale (moved from day 21); publishing it makes 🔥 21 |
