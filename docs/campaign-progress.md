@@ -45,7 +45,7 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 20 | Serverless architecture patterns | ✅ | ✅ | ✅ | 🔥 15 | published live |
 | 21 | Amazon SQS and decoupling with queues | ✅ | ✅ | ✅ | 🔥 16 | published live (regenerated after a placeholder failure; example run end to end by hand) |
 | 22 | AWS Step Functions | ✅ | ✅ | ✅ | 🔥 17 | published live |
-| 23 | Amazon CloudFront and content delivery | ✅ | ⬜ | ⬜ | · broken | NEXT — generated 19 Nov; draft tonight, publish 20 Nov |
+| 23 | Amazon CloudFront and content delivery | ✅ | ✅ | ⬜ | · broken | NEXT — generated 19 Nov; draft tonight, publish 20 Nov |
 | 24 | AWS KMS and encryption at rest | ⬜ | ⬜ | ⬜ | · broken | added |
 | 25 | Amazon Route 53 and DNS fundamentals | ⬜ | ⬜ | ⬜ | · broken | added |
 | 26 | Lessons learned: connecting the AWS fundamentals | ⬜ | ⬜ | ⬜ | · broken | finale (moved from day 21); publishing it makes 🔥 21 |
