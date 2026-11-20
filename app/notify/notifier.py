@@ -41,6 +41,7 @@ __all__ = [
     "REASON_MAX",
     "MAX_PUBLISH_ATTEMPTS",
     "URL_UNAVAILABLE",
+    "DAILY_HABIT",
     "SNSClient",
     "NotificationContext",
     "Notifier",
@@ -55,6 +56,16 @@ MAX_PUBLISH_ATTEMPTS = 3
 # Explicit marker used when a success notification has no Builder Center URL
 # (Requirement 10.2).
 URL_UNAVAILABLE = "unavailable"
+
+# A fixed reminder of the daily engagement habit, added to every success email.
+# It is static on purpose: the Lambda cannot see what you have already done
+# today (that log lives on your machine), so it carries no personal data.
+DAILY_HABIT = (
+    "Today's habit (about 5 minutes): visit Builder Center, like one thing you "
+    "found useful, leave one genuine comment, and answer any replies. Once a "
+    "week, vote on one wish. Log it with: python tools/builder_publish/engage.py "
+    "--done like comment"
+)
 
 
 class SNSClient(Protocol):
@@ -124,6 +135,7 @@ class Notifier:
             "publication_url": url,
             "timestamp": self._clock.now_iso(),
             "next_action": next_action,
+            "daily_habit": DAILY_HABIT,
         }
         subject = f"AWS Builder Automation - Day {ctx.day} ready to post"
         self._safe_publish(ctx, subject, payload)

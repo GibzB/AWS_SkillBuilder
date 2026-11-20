@@ -27,9 +27,11 @@ Usage:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from playwright.sync_api import sync_playwright, Page
+from playwright.sync_api import Locator, sync_playwright, Page
 
 LOGIN_URL = "https://builder.aws.com/"
 BADGES_URL = "https://builder.aws.com/profile?tab=badges"
@@ -130,7 +132,7 @@ def _activate_badges_tab(page: Page) -> None:
     first, then a plain text/link fallback.
     """
     page.wait_for_timeout(1000)
-    clickers = [
+    clickers: list[Callable[[], Locator]] = [
         lambda: page.get_by_role("tab", name="Badges"),
         lambda: page.get_by_role("link", name="Badges"),
         lambda: page.get_by_text("Badges", exact=True),
@@ -307,7 +309,7 @@ def main() -> int:
     print(f"  raw html   -> {OUT_RAW_HTML}")
     print(f"  screenshot -> {OUT_PNG}")
 
-    def _preview(title: str, items: list[dict]) -> None:
+    def _preview(title: str, items: list[dict[str, Any]]) -> None:
         if not items:
             return
         print(f"\n{title}:")

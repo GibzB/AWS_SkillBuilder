@@ -263,7 +263,25 @@ def mark_published(day: int, path: Path = DOC_PATH) -> int:
     streak = current_streak(text)
     text = set_banner(text, streak)
     _write(path, text)
+    _log_publish(path)
     return streak
+
+
+def _log_publish(path: Path) -> None:
+    """Record a "publish" in the daily engagement log (best effort).
+
+    Only for the real checklist: tests and ad-hoc copies pass another path and
+    must not write into the user's home directory. A failure here never blocks
+    the checklist update.
+    """
+    if path != DOC_PATH:
+        return
+    try:
+        import engagement_store
+
+        engagement_store.record_action("publish")
+    except Exception:  # noqa: BLE001 - the log is a convenience, not a gate
+        pass
 
 
 # --------------------------------- CLI ------------------------------------- #

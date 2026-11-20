@@ -60,80 +60,29 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 > consecutive days. If you skip a day, the chain breaks: mark that day
 > `· broken` and restart the next published day at 🔥 1.
 
-## Builder Center badges — live status & strategy
+## Builder Center badges: live status
 
-Scraped live from `https://builder.aws.com/profile?tab=badges` via
-`tools/builder_publish/harvest_badges.py` (reuses your login; reads each
-badge's name, description, and state from the rendered grid). Re-run that tool
-to refresh this section.
+The earned, in-progress and not-started lists used to live here and went stale.
+They are now generated from your real profile by a daily, read-only snapshot:
 
-Badges reward GENUINE engagement — there is no automation shortcut, and the
-platform rate-limits rapid activity (the ~1-article/hour create limit and the
-GetUserProfileByProfileId throttle). The winning play is a small, consistent
-DAILY habit, not a burst. The 21-day series is the engine; these habits earn
-the badges around it.
-
-As of the last scrape: **7 earned, 12 in progress, 2 not started** (21 total).
-
-### ✅ Earned (7)
-
-- [x] **7-Day Visit Streak** — Visit Builder Center once a day for 7 consecutive days while signed in.
-- [x] **First Article** — Publish your first article.
-- [x] **First Wish** — Publish your first wish in AWS Wishlist.
-- [x] **Discussion Debut** — Join the conversation by leaving one comment on any content.
-- [x] **Hello, World!** — Complete the About section in your profile.
-- [x] **Knowledge Seeker** — Read 10 different articles.
-- [x] **Photo Finisher** — Upload a photo to your profile.
-
-### 🔄 In progress — keep the daily habit going (12)
-
-Streaks (just keep showing up / liking / commenting daily — don't break the chain):
-
-- [ ] **30-Day Visit Streak** — Visit at least once a day for 30 consecutive days. (7-day already done)
-- [ ] **90-Day Visit Streak** — Visit at least once a day for 90 consecutive days.
-- [ ] **7-Day Like Streak** — Leave ≥1 like on any content each day for 7 consecutive days.
-- [ ] **30-Day Like Streak** — ...for 30 consecutive days.
-- [ ] **90-Day Like Streak** — ...for 90 consecutive days.
-- [ ] **7-Day Comment Streak** — Leave ≥1 comment on any content each day for 7 consecutive days.
-- [ ] **30-Day Comment Streak** — ...for 30 consecutive days.
-- [ ] **90-Day Comment Streak** — ...for 90 consecutive days.
-- [ ] **4-Week Article Publishing Streak** — Publish an article weekly for 4 consecutive weeks.
-
-Impact (needs real engagement from others on genuinely useful content):
-
-- [ ] **Valued Creator** — Get 10 likes on five of your articles.
-- [ ] **Conversation Starter** — Get a reply on 10 of your comments.
-- [ ] **Meaningful Contributor** — Get 10 likes on five of your comments.
-
-### ⚪ Not started (2)
-
-- [ ] **Idea Influencer** — Get 10 votes on your wishes.
-- [ ] **4-Week Wish Vote Streak** — Vote on a wish each week for 4 consecutive weeks.
-
-### The 5-minute daily habit (this earns almost everything above)
-
-Tie it to the "Day N ready to post" email you already receive:
-
-1. **Visit** Builder Center → feeds the 30/90-day Visit Streaks.
-2. **Publish the day's drafted article** → feeds the 4-Week Publishing Streak.
-3. **Leave ≥1 like** on content you found good → feeds the 7/30/90 Like Streaks.
-4. **Leave ≥1 genuine comment** → feeds the 7/30/90 Comment Streaks + Discussion.
-5. **Reply** to comments/likes on your posts → feeds Conversation Starter.
-6. **Vote on one wish** (occasionally) → feeds Idea Influencer + Wish Vote Streak.
-
-Do those once a day and every in-progress streak badge lands on schedule, while
-the impact badges (Valued Creator, Conversation Starter, Meaningful Contributor)
-build as real people engage with useful posts. Spacing it daily also keeps you
-clear of the rate limits.
+- **Dashboard:** [docs/badge-dashboard.md](badge-dashboard.md) (progress bars,
+  estimated finish dates, what changed, today's priorities). It is created by the
+  first snapshot and rewritten on every run.
+- **Morning routine:** `python tools/builder_publish/engage.py daily`
+  (snapshot, dashboard, reading list, status in one browser window).
+- **Log what you did:** `python tools/builder_publish/engage.py --done like comment`
+- **Full workflow and commands:** [tools/builder_publish/ENGAGEMENT.md](../tools/builder_publish/ENGAGEMENT.md)
 
 ### Why no automation here (honest note)
 
-- Streaks require a real daily visit/like/comment — faking them means evading
+- Streaks require a real daily visit/like/comment. Faking them means evading
   controls, which risks the account and its perks.
 - Impact badges depend on real people engaging with genuinely useful posts;
-  there's nothing to automate that isn't gaming.
+  there is nothing to automate that is not gaming.
 - The platform's throttles are a signal to go human-paced; the daily habit both
   earns the badges and stays within the limits.
+- The tools read and record only. A test fails if the browser tools ever gain a
+  way to like, comment, reply or vote.
 
 ---
 
@@ -185,18 +134,17 @@ Tie it to the "Day N ready to post" email the automation sends you:
 Steps 1, 3, 4 are the non-negotiable streak-feeders (<5 min total). Steps 2, 5,
 6 are situational. On a zero-energy day, do at least steps 1, 3, 4.
 
-### After the 21-day series ends
+### After the series ends (day 26)
 
-The publishing run finishes on day 21, but the big streak badges need 90 days.
+The publishing run finishes on day 26, but the big streak badges need 90 days.
 Keep going:
 
 - **Keep visiting daily** → 90-Day Visit Streak (the headline badge).
 - **Keep liking + commenting daily** → 90-Day Like/Comment Streaks.
 - **Publish something weekly** (doesn't have to be daily) → keeps the publishing
   cadence alive and keeps feeding the impact badges with fresh content.
-- **Re-run the harvester** every week or two to refresh this file:
-  `AWS_PROFILE=default python tools/builder_publish/harvest_badges.py`
-  then update the ✅/🔄/⚪ lists above.
+- **Run the morning routine** (`python tools/builder_publish/engage.py daily`)
+  to refresh the badge dashboard and see what is open today.
 
 ### Weekly streak tracker (tick a box each day you keep the chain)
 

@@ -100,3 +100,28 @@ def test_retry_then_success_records_one_message() -> None:
         NotificationContext(campaign_id="c1", day=1, topic_arn=_TOPIC, title="t")
     )
     assert len(client.calls) == 1  # succeeded on the final attempt
+
+
+def test_success_email_carries_the_static_daily_habit_line() -> None:
+    from app.notify.notifier import DAILY_HABIT
+
+    notifier, client = _notifier()
+    notifier.notify_success(
+        NotificationContext(
+            campaign_id="c1", day=3, topic_arn=_TOPIC, title="t", publication_url="https://x"
+        )
+    )
+    msg = json.loads(client.calls[0]["Message"])
+    assert msg["daily_habit"] == DAILY_HABIT
+    assert "engage.py --done like comment" in msg["daily_habit"]
+    assert "@" not in msg["daily_habit"]  # static text, no personal data
+
+
+def test_failure_email_does_not_carry_the_habit_line() -> None:
+    notifier, client = _notifier()
+    notifier.notify_failure(
+        NotificationContext(
+            campaign_id="c1", day=3, topic_arn=_TOPIC, stage="validation", error_reason="bad"
+        )
+    )
+    assert "daily_habit" not in json.loads(client.calls[0]["Message"])
