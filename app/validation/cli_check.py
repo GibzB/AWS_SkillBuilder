@@ -86,10 +86,23 @@ class CliIssue:
     reason: str
 
 
+def _quotes_balanced(text: str) -> bool:
+    """True if every quote in ``text`` is closed (so a command is complete)."""
+    try:
+        shlex.split(text, comments=True)
+    except ValueError:
+        return False
+    return True
+
+
 def extract_aws_commands(markdown: str) -> list[str]:
     """Return every ``aws ...`` command from shell-style fenced code blocks.
 
-    Handles ``$ `` prompts and backslash line continuations.
+    Handles ``$ `` prompts, backslash line continuations, ``NAME=$(aws ...)``
+    captures, and arguments quoted across several lines (for example a JSON
+    ``--change-batch '...'`` written over many lines): such a command keeps
+    absorbing lines until its quotes close. A quote that never closes is returned
+    as-is so the checker reports it as unparseable.
     """
     commands: list[str] = []
     for match in re.finditer(r"```([^\n`]*)\n(.*?)```", markdown, re.DOTALL):
@@ -97,15 +110,27 @@ def extract_aws_commands(markdown: str) -> list[str]:
         if lang not in _SHELL_LANGS:
             continue
         joined = re.sub(r"\\\s*\n", " ", match.group(2))
-        for line in joined.splitlines():
-            line = line.strip()
-            line = re.sub(r"^[$>]\s*", "", line)
+        pending = ""
+        for raw in joined.splitlines():
+            if pending:
+                pending += "\n" + raw
+                if _quotes_balanced(pending):
+                    commands.append(pending)
+                    pending = ""
+                continue
+            line = re.sub(r"^[$>]\s*", "", raw.strip())
             # Capture form: NAME=$(aws ... --query X --output text)
             captured = re.match(r"^[A-Za-z_]\w*=\"?\$\((aws .*)\)\"?\s*$", line)
             if captured:
                 line = captured.group(1)
-            if line.startswith("aws "):
+            if not line.startswith("aws "):
+                continue
+            if _quotes_balanced(line):
                 commands.append(line)
+            else:
+                pending = line
+        if pending:
+            commands.append(pending)
     return commands
 
 
@@ -193,6 +218,10 @@ def find_unshown_files(markdown: str) -> list[str]:
 # A 12-digit run is an AWS account ID (ARNs, queue URLs, ECR registries, ...).
 # Articles use dummy ones such as 123456789012 that a reader cannot reproduce.
 _ACCOUNT_ARN = re.compile(r"(?<!\d)\d{12}(?!\d)")
+# Made-up resource IDs that models write as filler: a run of 123456789 (security
+# groups, instances, AMIs, hosted zones), the alphabet-looking ABCDEFGHIJ, or the
+# word EXAMPLE. A reader has no such resource, so the command cannot run.
+_DUMMY_ID = re.compile(r"123456789|ABCDEFGHIJ|abcdef0123|EXAMPLE")
 
 
 def find_unreproducible_commands(markdown: str) -> list[str]:
@@ -207,7 +236,9 @@ def find_unreproducible_commands(markdown: str) -> list[str]:
     return [
         command
         for command in extract_aws_commands(markdown)
-        if _ACCOUNT_ARN.search(command) or "fileb://" in command
+        if _ACCOUNT_ARN.search(command)
+        or _DUMMY_ID.search(command)
+        or "fileb://" in command
     ]
 
 

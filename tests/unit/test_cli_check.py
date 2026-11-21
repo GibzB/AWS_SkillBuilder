@@ -268,3 +268,53 @@ def test_placeholder_violation_quotes_the_offending_text() -> None:
     )
     message = next(v.message for v in result.violations if v.code == "PLACEHOLDER_PRESENT")
     assert "<object-key>" in message
+
+
+# -- multi-line quoted arguments and made-up resource IDs ---------------------
+
+_ROUTE53_MULTILINE = (
+    "```bash\n"
+    "aws route53 change-resource-record-sets --hosted-zone-id ZREALZONE --change-batch '{\n"
+    '  "Changes": [{"Action": "UPSERT"}]\n'
+    "}'\n"
+    "aws route53 list-hosted-zones\n"
+    "```\n"
+)
+
+
+def test_a_json_argument_spread_over_lines_is_one_command() -> None:
+    commands = extract_aws_commands(_ROUTE53_MULTILINE)
+    assert len(commands) == 2
+    assert commands[0].startswith("aws route53 change-resource-record-sets")
+    assert '"Changes"' in commands[0]
+    assert all(check_command(c) is None for c in commands)
+
+
+def test_a_quote_that_never_closes_is_still_reported() -> None:
+    (command,) = extract_aws_commands("```bash\naws s3 ls 'oops\n```\n")
+    assert "cannot parse" in (check_command(command) or "")
+
+
+@pytest.mark.parametrize(
+    "dummy",
+    [
+        "Z123456789ABCDEFGHIJ",
+        "sg-0123456789abcdef0",
+        "i-1234567890abcdef0",
+        "ami-0abcdef1234567890",
+        "arn:aws:iam::EXAMPLE:role/r",
+    ],
+)
+def test_made_up_resource_ids_are_not_reproducible(dummy: str) -> None:
+    md = f"```bash\naws ec2 describe-instances --instance-ids {dummy}\n```\n"
+    assert len(find_unreproducible_commands(md)) == 1
+
+
+def test_real_looking_ids_from_captures_are_fine() -> None:
+    md = (
+        "```bash\n"
+        "ZONE_ID=$(aws route53 list-hosted-zones --query 'HostedZones[0].Id' --output text)\n"
+        'aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID"\n'
+        "```\n"
+    )
+    assert find_unreproducible_commands(md) == []

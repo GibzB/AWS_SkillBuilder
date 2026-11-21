@@ -71,6 +71,13 @@ The body MUST include a section titled "Try it yourself" containing a fenced
   `QUEUE_URL=$(aws sqs create-queue --queue-name learning-queue --query QueueUrl --output text)`,
   then use "$QUEUE_URL". NEVER write a placeholder in angle brackets, and NEVER
   write a dummy 12-digit account ID such as 123456789012 in a URL or ARN.
+- Never write made-up resource IDs as filler (for example `sg-0123456789abcdef0`,
+  `i-1234567890abcdef0`, `Z123456789ABCDEFGHIJ`). The reader has no such resource.
+  Use read-only list or describe commands, or capture a real ID with `--query`.
+- Commands that create, change or delete DNS records, hosted zones, buckets or
+  keys are not suitable unless the article also creates the thing first and
+  removes it at the end. For Route 53, prefer `aws route53 list-hosted-zones`
+  and `aws route53 list-resource-record-sets` style read-only commands.
 - Only use a command a beginner can run as written. Do NOT use commands that need
   an IAM role ARN, an account ID, or a zip or package file the reader does not
   have (for example `aws lambda create-function`). Do not name runtimes, engine
