@@ -31,11 +31,19 @@ def _el(index: int, **kw: Any) -> dict[str, Any]:
 
 def test_bundled_wishes_load_and_pass_the_checks() -> None:
     files = sorted((TOOLS / "wishes").glob("*.md"))
-    assert {f.stem for f in files} >= {dw.DEFAULT_WISH, "create-limit-wait-time"}
+    assert {f.stem for f in files} >= {dw.DEFAULT_WISH, "bedrock-model-access-status"}
     for path in files:
         wish = dw.load_wish(path)
         assert dw.check_wish(wish) == [], path.name
         assert 0 < len(wish.title) <= 120
+
+
+def test_wishes_are_about_aws_services_not_builder_center() -> None:
+    """The Wishlist is for AWS service improvements; keep drafts on target."""
+    for path in sorted((TOOLS / "wishes").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        assert "builder center" not in text.lower(), f"{path.name} is about the platform, not an AWS service"
+        assert "Bedrock" in text, f"{path.name} should name the AWS service it concerns"
 
 
 def test_load_wish_requires_a_title_line(tmp_path: Path) -> None:

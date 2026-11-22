@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Assisted wish drafting: fill the create-wish form, you review and submit.
 
-Opens https://builder.aws.com/create/wish in your saved, signed-in browser
+The Wishlist is for improvements to AWS services (for example Amazon Bedrock), not
+for Builder Center itself, so each wish file must describe a real problem with an AWS
+service. Opens https://builder.aws.com/create/wish in your saved, signed-in browser
 profile and fills the title and description from a Markdown file in
 ``tools/builder_publish/wishes/``. It then lists every other field it found
 (for example a category) so you can set them by hand.
@@ -17,7 +19,7 @@ the page HTML, which is how the detection gets refined.
 
 Usage:
     python tools/builder_publish/draft_wish.py                       # default wish
-    python tools/builder_publish/draft_wish.py --wish create-limit-wait-time
+    python tools/builder_publish/draft_wish.py --wish bedrock-model-access-status
     python tools/builder_publish/draft_wish.py --inspect
 """
 
@@ -37,7 +39,7 @@ from harvest_badges import LOGIN_URL, PROFILE_DIR  # noqa: E402
 
 CREATE_WISH_URL = "https://builder.aws.com/create/wish"
 WISHES_DIR = Path(__file__).resolve().parent / "wishes"
-DEFAULT_WISH = "streak-day-boundary"
+DEFAULT_WISH = "bedrock-inference-profile-error"
 OUT_DIR = Path(__file__).resolve().parent
 
 # Every element a person could type into. Document order matters: it is the
