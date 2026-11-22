@@ -45,6 +45,8 @@ tools/builder_publish/badges.json
 tools/builder_publish/badges_raw.txt
 tools/builder_publish/badges_raw.html
 tools/builder_publish/badges_page.png
+tools/builder_publish/wish_form.html
+tools/builder_publish/wish_form.png
 # Raw captures of your own profile and feed (may show personal details).
 # Promote a trimmed, redacted copy by hand if you want it as a test fixture.
 tests/fixtures/*_real.*
