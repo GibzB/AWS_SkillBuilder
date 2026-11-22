@@ -5,7 +5,7 @@
 
 Campaign: `aws-learning-21` ("21 Days of AWS: What I Learned Building with the Cloud")
 
-> 🔥 **Current posting streak: Day 19** — keep publishing consecutive days to extend the chain.
+> 🔥 **Current posting streak: Day 20** — keep publishing consecutive days to extend the chain.
 > chain at 🔥 Streak Day 1. (Days 1–5 were the previous streak, broken when
 > day 6 was skipped.) Update this number each time you publish.
 
@@ -47,8 +47,8 @@ AWS_PROFILE=default python tools/builder_publish/batch_publish.py --from N --to 
 | 22 | AWS Step Functions | ✅ | ✅ | ✅ | 🔥 17 | published live |
 | 23 | Amazon CloudFront and content delivery | ✅ | ✅ | ✅ | 🔥 18 | published live 20 Nov (hand-rewritten; commands run in own account) |
 | 24 | AWS KMS and encryption at rest | ✅ | ✅ | ✅ | 🔥 19 | published live 21 Nov; check the live post uses "KMS key" and describes envelope encryption correctly |
-| 25 | Amazon Route 53 and DNS fundamentals | ✅ | ⬜ | ⬜ | · broken | NEXT — regenerated 21 Nov (the 09:00 draft hit a checker bug); draft tonight, publish 22 Nov |
-| 26 | Lessons learned: connecting the AWS fundamentals | ⬜ | ⬜ | ⬜ | · broken | finale (moved from day 21); publishing it makes 🔥 21 |
+| 25 | Amazon Route 53 and DNS fundamentals | ✅ | ✅ | ✅ | 🔥 20 | published live 22 Nov (rewritten by hand to fix factual errors) |
+| 26 | Lessons learned: connecting the AWS fundamentals | ✅ | ⬜ | ⬜ | · broken | NEXT — generated 22 Nov; replace the body with the rewrite, publish 23 Nov for 🔥 21 |
 
 > S3 column assumes the campaign articles are generated (they were, in the last
 > full run). Verify a day's S3 page by opening

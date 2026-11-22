@@ -1,6 +1,6 @@
 # Builder Center badge dashboard
 
-Updated 2026-11-21 by `tools/builder_publish/badge_snapshot.py`. Do not edit by hand; it is rewritten on every snapshot.
+Updated 2026-11-22 by `tools/builder_publish/badge_snapshot.py`. Do not edit by hand; it is rewritten on every snapshot.
 
 **10 earned, 11 to go** (21 total).
 
@@ -18,15 +18,15 @@ Updated 2026-11-21 by `tools/builder_publish/badge_snapshot.py`. Do not edit by 
 
 | Badge | Needs | Progress | Estimated finish |
 |---|---|---|---|
-| 7-Day Comment Streak | comment daily | #######--- 71% 5/7 days | 2026-11-23 |
+| 7-Day Comment Streak | comment daily | #######--- 71% 5/7 days | 2026-11-24 |
 | Conversation Starter | other people must react | #######--- 70% 7/10 | depends on others |
-| 30-Day Visit Streak | visit daily | ######---- 63% 19/30 days | 2026-12-02 |
-| 4-Week Wish Vote Streak | vote on a wish weekly | #####----- 50% 2/4 weeks | 2026-12-05 |
-| 30-Day Like Streak | like something daily | #####----- 50% 15/30 days | 2026-12-06 |
-| 90-Day Visit Streak | visit daily | ##-------- 21% 19/90 days | 2027-01-31 |
-| 90-Day Like Streak | like something daily | ##-------- 17% 15/90 days | 2027-02-04 |
-| 30-Day Comment Streak | comment daily | ##-------- 17% 5/30 days | 2026-12-16 |
-| 90-Day Comment Streak | comment daily | #--------- 6% 5/90 days | 2027-02-14 |
+| 30-Day Visit Streak | visit daily | ######---- 63% 19/30 days | 2026-12-03 |
+| 4-Week Wish Vote Streak | vote on a wish weekly | #####----- 50% 2/4 weeks | 2026-12-06 |
+| 30-Day Like Streak | like something daily | #####----- 50% 15/30 days | 2026-12-07 |
+| 90-Day Visit Streak | visit daily | ##-------- 21% 19/90 days | 2027-02-01 |
+| 90-Day Like Streak | like something daily | ##-------- 17% 15/90 days | 2027-02-05 |
+| 30-Day Comment Streak | comment daily | ##-------- 17% 5/30 days | 2026-12-17 |
+| 90-Day Comment Streak | comment daily | #--------- 6% 5/90 days | 2027-02-15 |
 | Meaningful Contributor | other people must react | ---------- 0% 0/5 | depends on others |
 | Idea Influencer | other people must react | ---------- 0% 0/10 | depends on others |
 
