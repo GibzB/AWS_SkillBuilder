@@ -104,8 +104,11 @@ _FORM_TEXTAREA = f"""
   <input placeholder="Title">
   <textarea placeholder="Describe your wish"></textarea>
   <select aria-label="Type of request"><option>Feature Request</option></select>
+  <button>Choose category</button>
+  <button>Select tags</button>
   <button>Submit</button>
-</main>"""
+</main>
+<nav><button>Explore AWS</button></nav>"""
 
 _FORM_RICH = f"""
 <header><input placeholder="Search"></header>
@@ -154,6 +157,8 @@ def test_fills_a_textarea_form_without_a_single_click(monkeypatch: pytest.Monkey
     assert state["clicks"] == 0  # Submit, dropdowns and everything else untouched
     assert any("Type of request" in item for item in report["selects"])
     assert "Submit" in report["buttons"]
+    assert report["choices"] == ["Choose category", "Select tags"]  # left for the user
+    assert "Explore AWS" not in report["buttons"]  # page chrome is hidden from the list
 
 
 def test_fills_a_rich_text_description_without_clicking(monkeypatch: pytest.MonkeyPatch) -> None:

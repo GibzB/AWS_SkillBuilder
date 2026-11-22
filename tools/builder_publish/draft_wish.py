@@ -84,13 +84,19 @@ _LISTING_JS = r"""
     if (label && shown && label !== shown) return (label + ': ' + shown).slice(0, 80);
     return (label || shown).slice(0, 80);
   };
-  const pick = (sel) => Array.from(document.querySelectorAll(sel))
-    .filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; })
+  const pick = (sel, skipChrome) => Array.from(document.querySelectorAll(sel))
+    .filter(el => {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return false;
+      return !(skipChrome && el.closest('header, nav, footer, [role="navigation"]'));
+    })
     .map(text).filter(Boolean);
+  const buttons = pick('button, [role="button"]', true);
   return {
-    selects: pick('select, [role="combobox"], [role="listbox"], [aria-haspopup="listbox"]'),
-    buttons: pick('button, [role="button"]'),
-    checkboxes: pick('input[type="checkbox"], [role="checkbox"], [role="radio"], input[type="radio"]'),
+    selects: pick('select, [role="combobox"], [role="listbox"], [aria-haspopup="listbox"]', true),
+    buttons,
+    choices: buttons.filter(b => /^(choose|select)\b/i.test(b)),
+    checkboxes: pick('input[type="checkbox"], [role="checkbox"], [role="radio"], input[type="radio"]', true),
   };
 }
 """
@@ -235,8 +241,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             report = fill_wish(page, wish)
             print(f"\nTitle filled: {report['title_filled']}   Description filled: {report['body_filled']}")
-            print(f"Dropdowns or selectors on the form: {report['selects'] or 'none seen'}")
-            print(f"Buttons on the form: {report['buttons']}")
+            choices = report["choices"] or report["selects"]
+            print(f"Still for YOU to choose: {choices or 'nothing seen'}")
+            print(f"Other buttons on the form: {report['buttons']}")
             if not (report["title_filled"] and report["body_filled"]):
                 print("I could not identify both fields. Paste the text by hand:")
                 print(f"\n{wish.title}\n\n{wish.body}\n")
