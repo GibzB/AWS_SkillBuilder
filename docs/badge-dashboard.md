@@ -12,13 +12,7 @@ Updated 2026-11-22 by `tools/builder_publish/badge_snapshot.py`. Do not edit by 
 
 ## Changes since the last snapshot
 
-- progress: **7-Day Comment Streak** 5/7 days -> 6/7 days
-- progress: **30-Day Visit Streak** 19/30 days -> 20/30 days
-- progress: **30-Day Like Streak** 15/30 days -> 16/30 days
-- progress: **90-Day Visit Streak** 19/90 days -> 20/90 days
-- progress: **30-Day Comment Streak** 5/30 days -> 6/30 days
-- progress: **90-Day Like Streak** 15/90 days -> 16/90 days
-- progress: **90-Day Comment Streak** 5/90 days -> 6/90 days
+- No change.
 
 ## Still to earn
 
