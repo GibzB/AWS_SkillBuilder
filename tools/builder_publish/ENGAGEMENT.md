@@ -14,6 +14,21 @@ All commands run from the repo root with the virtual environment active:
 cd "/Users/bizee/Documents/Code_Projects/AWS SkillBuilder" && source .venv/bin/activate
 ```
 
+## Shortcut: no virtual environment needed
+
+`scripts/run.sh` runs any of these tools with the project's own Python, from any
+folder, so "command not found: python" cannot happen:
+
+```bash
+scripts/run.sh engage daily                 # morning routine
+scripts/run.sh engage --done like comment   # log what you did
+scripts/run.sh engage                       # what is open today
+scripts/run.sh progress --day 27 --state published
+```
+
+Everything below also works with `python tools/builder_publish/...` once the
+environment is active (`source .venv/bin/activate`).
+
 ## Every morning (one command)
 
 ```bash
