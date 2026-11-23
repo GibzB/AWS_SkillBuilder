@@ -252,8 +252,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:  # noqa: BLE001 - the screenshot is a convenience
             pass
         print(
-            "\nReview the draft in the browser, set any dropdown (such as the type of "
-            "request) yourself, then YOU press Submit. Nothing was submitted."
+            "\nReview the draft in the browser, choose the category and tags yourself, then "
+            "YOU press Submit. Nothing was submitted."
         )
         try:
             input("Press Enter to close the browser... ")
