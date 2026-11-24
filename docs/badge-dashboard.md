@@ -6,29 +6,31 @@ Updated 2026-11-24 by `tools/builder_publish/badge_snapshot.py`. Do not edit by 
 
 ## Today's priorities
 
-1. **30-Day Visit Streak** (visit): 22/30 days; keep the chain unbroken (8 days to go)
-2. **30-Day Like Streak** (like): 17/30 days; keep the chain unbroken (13 days to go)
-3. **4-Week Wish Vote Streak** (vote): 2/4 weeks; keep the chain unbroken (14 days to go)
+1. **4-Week Wish Vote Streak** (vote): 3/4 weeks; keep the chain unbroken (7 days to go)
+2. **30-Day Visit Streak** (visit): 22/30 days; keep the chain unbroken (8 days to go)
+3. **30-Day Like Streak** (like): 18/30 days; keep the chain unbroken (12 days to go)
 
 ## Changes since the last snapshot
 
-- progress: **30-Day Visit Streak** 21/30 days -> 22/30 days
-- progress: **Idea Influencer** 4/10 -> 7/10
-- progress: **90-Day Visit Streak** 21/90 days -> 22/90 days
+- progress: **4-Week Wish Vote Streak** 2/4 weeks -> 3/4 weeks
+- progress: **30-Day Like Streak** 17/30 days -> 18/30 days
+- progress: **30-Day Comment Streak** 7/30 days -> 8/30 days
+- progress: **90-Day Like Streak** 17/90 days -> 18/90 days
+- progress: **90-Day Comment Streak** 7/90 days -> 8/90 days
 
 ## Still to earn
 
 | Badge | Needs | Progress | Estimated finish |
 |---|---|---|---|
+| 4-Week Wish Vote Streak | vote on a wish weekly | ########-- 75% 3/4 weeks | 2026-12-01 |
 | 30-Day Visit Streak | visit daily | #######--- 73% 22/30 days | 2026-12-02 |
 | Idea Influencer | other people must react | #######--- 70% 7/10 | depends on others |
 | Conversation Starter | other people must react | #######--- 70% 7/10 | depends on others |
-| 30-Day Like Streak | like something daily | ######---- 57% 17/30 days | 2026-12-07 |
-| 4-Week Wish Vote Streak | vote on a wish weekly | #####----- 50% 2/4 weeks | 2026-12-08 |
+| 30-Day Like Streak | like something daily | ######---- 60% 18/30 days | 2026-12-06 |
+| 30-Day Comment Streak | comment daily | ###------- 27% 8/30 days | 2026-12-16 |
 | 90-Day Visit Streak | visit daily | ##-------- 24% 22/90 days | 2027-01-31 |
-| 30-Day Comment Streak | comment daily | ##-------- 23% 7/30 days | 2026-12-17 |
-| 90-Day Like Streak | like something daily | ##-------- 19% 17/90 days | 2027-02-05 |
-| 90-Day Comment Streak | comment daily | #--------- 8% 7/90 days | 2027-02-15 |
+| 90-Day Like Streak | like something daily | ##-------- 20% 18/90 days | 2027-02-04 |
+| 90-Day Comment Streak | comment daily | #--------- 9% 8/90 days | 2027-02-14 |
 | Meaningful Contributor | other people must react | ---------- 0% 0/5 | depends on others |
 
 ## Earned
