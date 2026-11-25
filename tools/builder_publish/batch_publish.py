@@ -38,12 +38,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from suggest_tags import suggest_tag_terms  # noqa: E402
 from choose_tags import choose_tags, load_vocabulary  # noqa: E402
 import progress_tracker  # noqa: E402
+from diagram_attach import attach_png, split_body_at_marker, strip_marker  # noqa: E402
+
+# tools/ (for the diagrams package) and the repo root (for app.diagrams).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from diagrams.render import render_spec  # noqa: E402
 
 CREATE_URL = "https://builder.aws.com/create/content"
 LOGIN_URL = "https://builder.aws.com/"
 PROFILE_DIR = Path.home() / ".aws-builder-publish" / "chrome-profile"
 OUT_DIR = Path(__file__).resolve().parent
 REGION = "eu-west-1"
+
+NEWS_CAMPAIGN = "aws-news-30"
+NEWS_TABLE = "aws-builder-aws-news-30-campaign"
+NEWS_DOC = progress_tracker.DOC_PATH.parent / "news-campaign-progress.md"
+NEWS_LAST_DAY = 30
 
 TITLE_SELECTOR = 'textarea[placeholder="Title"]'
 DESCRIPTION_SELECTOR = 'textarea[placeholder="Description"]'
@@ -135,11 +146,13 @@ def _select_tags(page: Page, tags: list[str]) -> tuple[list[str], list[str]]:
     return added, failed
 
 
-def _load_article(table: str, campaign_id: str, day: int, region: str) -> dict[str, object]:
+def _load_article(
+    table: str, campaign_id: str, day: int, region: str, *, prefix: str = "DAY"
+) -> dict[str, object]:
     ddb = boto3.client("dynamodb", region_name=region)
     resp = ddb.get_item(
         TableName=table,
-        Key={"pk": {"S": f"CAMPAIGN#{campaign_id}"}, "sk": {"S": f"DAY#{day:04d}"}},
+        Key={"pk": {"S": f"CAMPAIGN#{campaign_id}"}, "sk": {"S": f"{prefix}#{day:04d}"}},
     )
     item = resp.get("Item")
     if not item:
@@ -151,6 +164,8 @@ def _load_article(table: str, campaign_id: str, day: int, region: str) -> dict[s
         "description": item.get("description", {}).get("S", ""),
         "body_markdown": item.get("body_markdown", {}).get("S", ""),
         "tags": item.get("tags", {}).get("SS", []),
+        "source_link": item.get("source_link", {}).get("S", ""),
+        "diagram_json": item.get("diagram_json", {}).get("S", ""),
     }
 
 
@@ -179,7 +194,21 @@ def _check_rate_limited(page: Page) -> None:
         )
 
 
-def _fill_article(page: Page, article: dict[str, object]) -> None:
+def _paste(page: Page, editor, text: str) -> None:  # type: ignore[no-untyped-def]
+    """Paste ``text`` into the body editor (typing is the fallback)."""
+    try:
+        page.evaluate(
+            "async (t) => { await navigator.clipboard.writeText(t); }", text
+        )
+        modifier = "Meta" if sys.platform == "darwin" else "Control"
+        page.keyboard.press(f"{modifier}+V")
+    except Exception:  # noqa: BLE001 - typing fallback also triggers transforms
+        editor.type(text, delay=0)
+
+
+def _fill_article(
+    page: Page, article: dict[str, object], png_path: Path | None = None
+) -> None:
     """Open a fresh editor and fill title, description, and body.
 
     Respects Builder Center's create rate limit: if the limit message appears
@@ -202,14 +231,18 @@ def _fill_article(page: Page, article: dict[str, object]) -> None:
     editor = _find_body_editor(page)
     editor.click()
     markdown = str(article["body_markdown"])
-    try:
-        page.evaluate(
-            "async (t) => { await navigator.clipboard.writeText(t); }", markdown
-        )
-        modifier = "Meta" if sys.platform == "darwin" else "Control"
-        page.keyboard.press(f"{modifier}+V")
-    except Exception:  # noqa: BLE001 - typing fallback also triggers transforms
-        editor.type(markdown, delay=0)
+    parts = split_body_at_marker(markdown) if png_path is not None else None
+    if png_path is not None and parts is not None:
+        # Body in two parts around the marker, picture in between.
+        before, after = parts
+        _paste(page, editor, before + "\n")
+        attached = attach_png(page, png_path)
+        # Move the caret to the end of the document, below the picture.
+        page.keyboard.press("Meta+ArrowDown" if sys.platform == "darwin" else "Control+End")
+        _paste(page, editor, ("" if attached else "\n") + after + "\n")
+    else:
+        # No picture to place: never paste the placeholder reference.
+        _paste(page, editor, strip_marker(markdown))
 
 
 def _find_body_editor(page: Page):  # type: ignore[no-untyped-def]
@@ -249,9 +282,29 @@ def _find_body_editor(page: Page):  # type: ignore[no-untyped-def]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Batch Builder Center assisted publish")
     parser.add_argument("--from", dest="start", type=int, default=1)
-    parser.add_argument("--to", dest="end", type=int, default=21)
-    parser.add_argument("--campaign", default="aws-learning-21")
-    parser.add_argument("--table", default="aws-builder-aws-learning-21-campaign")
+    parser.add_argument("--to", dest="end", type=int, default=None)
+    parser.add_argument("--campaign", default=None)
+    parser.add_argument("--table", default=None)
+    parser.add_argument(
+        "--news",
+        action="store_true",
+        help=(
+            f"Use the news campaign ({NEWS_CAMPAIGN}, table {NEWS_TABLE}, "
+            f"days up to {NEWS_LAST_DAY}) and its progress doc."
+        ),
+    )
+    parser.add_argument(
+        "--week",
+        type=int,
+        default=None,
+        help="Draft the weekly roundup WEEK#NN instead of daily articles.",
+    )
+    parser.add_argument(
+        "--doc",
+        type=Path,
+        default=None,
+        help="Progress doc to update (default: the campaign's doc).",
+    )
     parser.add_argument("--region", default=REGION)
     parser.add_argument(
         "--no-bedrock",
@@ -279,8 +332,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    days = list(range(args.start, args.end + 1))
-    print(f"Batch publish: campaign={args.campaign} days {args.start}..{args.end}")
+    if args.news or args.week is not None:
+        args.campaign = args.campaign or NEWS_CAMPAIGN
+        args.table = args.table or NEWS_TABLE
+    args.campaign = args.campaign or "aws-learning-21"
+    args.table = args.table or "aws-builder-aws-learning-21-campaign"
+    if args.end is None:
+        args.end = NEWS_LAST_DAY if args.news else 21
+    is_week = args.week is not None
+    doc_path: Path = args.doc or (NEWS_DOC if (args.news or is_week) else progress_tracker.DOC_PATH)
+    label = "week" if is_week else "day"
+    key_prefix = "WEEK" if is_week else "DAY"
+
+    days = [args.week] if is_week else list(range(args.start, args.end + 1))
+    print(f"Batch publish: campaign={args.campaign} {label}s {days[0]}..{days[-1]}")
     print(
         f"Creating at most {args.max_articles} article(s) this run "
         "(Builder Center rate-limits new articles to ~1/hour)."
@@ -324,7 +389,9 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     break
 
-                article = _load_article(args.table, args.campaign, day, args.region)
+                article = _load_article(
+                    args.table, args.campaign, day, args.region, prefix=key_prefix
+                )
                 if not article:
                     print(f"\n[day {day}] no article found; skipping.")
                     continue
@@ -370,8 +437,16 @@ def main(argv: list[str] | None = None) -> int:
                         str(article["body_markdown"]), args.region,
                     )
 
+                png_path: Path | None = None
+                if article.get("diagram_json"):
+                    rendered = render_spec(
+                        str(article["diagram_json"]), f"{label}-{day:02d}"
+                    )
+                    print(f"  diagram: {rendered.message}")
+                    png_path = rendered.png_path
+
                 try:
-                    _fill_article(page, article)
+                    _fill_article(page, article, png_path)
                 except RateLimited as error:
                     print(f"\n  RATE LIMITED: {error}")
                     stopped_reason = (
@@ -399,8 +474,14 @@ def main(argv: list[str] | None = None) -> int:
                 # BC-draft stage is a fact we can record. Publishing is still a
                 # manual click, so we only tick 'published' after you confirm.
                 try:
-                    progress_tracker.mark_drafted(day)
-                    print(f"  checklist: marked day {day} drafted.")
+                    if is_week:
+                        week_drafted = getattr(progress_tracker, "mark_week_drafted", None)
+                        if week_drafted is None:
+                            raise RuntimeError("week rows are not supported by this tracker yet")
+                        week_drafted(day, doc_path)
+                    else:
+                        progress_tracker.mark_drafted(day, doc_path)
+                    print(f"  checklist: marked {label} {day} drafted.")
                 except Exception as error:  # noqa: BLE001 - never block publishing
                     print(f"  (checklist draft update skipped: {error})")
 
@@ -444,11 +525,18 @@ def main(argv: list[str] | None = None) -> int:
                 choice = ans.strip().lower()
                 if choice in ("p", "pc", "cp"):
                     try:
-                        streak = progress_tracker.mark_published(day)
-                        print(
-                            f"  checklist: marked day {day} PUBLISHED; "
-                            f"current posting streak is 🔥 {streak}."
-                        )
+                        if is_week:
+                            week_published = getattr(progress_tracker, "mark_week_published", None)
+                            if week_published is None:
+                                raise RuntimeError("week rows are not supported by this tracker yet")
+                            week_published(day, doc_path)
+                            print(f"  checklist: marked week {day} PUBLISHED.")
+                        else:
+                            streak = progress_tracker.mark_published(day, doc_path)
+                            print(
+                                f"  checklist: marked day {day} PUBLISHED; "
+                                f"current posting streak is 🔥 {streak}."
+                            )
                     except Exception as error:  # noqa: BLE001
                         print(f"  (checklist publish update skipped: {error})")
 
