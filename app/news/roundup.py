@@ -30,6 +30,7 @@ from zoneinfo import ZoneInfo
 from app.campaign.models import Campaign, CampaignDay, DayState
 from app.campaign.store import CampaignStore
 from app.common.clock import Clock
+from app.diagrams.normalise import normalise_diagram
 from app.common.errors import EngineError, GenerationError
 from app.generation.generator import ContentGenerator
 from app.generation.models import (
@@ -171,6 +172,7 @@ class RoundupRunner:
                 tags=article.tags,
                 publication_url=published.publication_url,
                 published_at=now,
+                diagram_json=article.diagram_json,
                 idempotency_key=f"{campaign_id}#week#{number}",
                 updated_at=now,
             )
@@ -220,7 +222,7 @@ class RoundupRunner:
         self, spec: GenerationSpec, topic: str, context: RoundupContext
     ) -> tuple[Article, ValidationResult]:
         """Generate, validate and give the generator one repair attempt."""
-        article = self._generator.generate(spec)
+        article = normalise_diagram(self._generator.generate(spec))
         result = self._validator.validate(article, topic, None, roundup=context)
         if result.is_valid:
             return article, result
@@ -228,7 +230,9 @@ class RoundupRunner:
         if not callable(revise):
             return article, result
         try:
-            revised = revise(spec, article, [v.message for v in result.violations])
+            revised = normalise_diagram(
+                revise(spec, article, [v.message for v in result.violations])
+            )
         except GenerationError:
             return article, result
         revised_result = self._validator.validate(revised, topic, None, roundup=context)

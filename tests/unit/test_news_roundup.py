@@ -355,3 +355,45 @@ def test_plain_scheduler_event_still_runs_the_daily() -> None:
     response, runner, orch = _route(event, store)
     assert response["statusCode"] == 200 and '"day": 5' in response["body"]
     assert orch.calls == ["aws-news-30"] and runner.calls == []
+
+
+_MARKER = "![Architecture diagram](diagram.png)"
+_SPEC = '{"nodes": [{"id": "fn", "service": "lambda", "label": "Handler"}], "edges": []}'
+
+
+class DiagramGenerator(Generator):
+    """A roundup generator that also returns a diagram marker and spec."""
+
+    def __init__(self, diagram: str) -> None:
+        super().__init__()
+        self._diagram = diagram
+
+    def generate(self, spec: GenerationSpec) -> Article:
+        from dataclasses import replace
+
+        article = super().generate(spec)
+        return replace(
+            article,
+            body_markdown=f"{article.body_markdown}\n\n{_MARKER}",
+            diagram_json=self._diagram,
+        )
+
+
+def test_roundup_keeps_and_stores_a_valid_diagram() -> None:
+    store, cid = _week2_store()
+    pub = Publisher()
+    result = _runner(store, DiagramGenerator(_SPEC), pub, Source([]), FakeSNSClient()).run(cid)
+    assert result.outcome is RoundupOutcome.PUBLISHED
+    assert pub.articles[0].diagram_json == _SPEC
+    week = store.get_week(cid, 2)
+    assert week is not None and week.diagram_json == _SPEC and _MARKER in week.body_markdown
+
+
+def test_roundup_drops_an_invalid_diagram_and_still_publishes() -> None:
+    store, cid = _week2_store()
+    pub = Publisher()
+    result = _runner(store, DiagramGenerator("not json"), pub, Source([]), FakeSNSClient()).run(cid)
+    assert result.outcome is RoundupOutcome.PUBLISHED
+    assert pub.articles[0].diagram_json == "" and "diagram.png" not in pub.articles[0].body_markdown
+    week = store.get_week(cid, 2)
+    assert week is not None and week.diagram_json == ""

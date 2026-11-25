@@ -159,3 +159,18 @@ def test_prompt_assets_contain_no_em_dash_or_unfilled_tokens() -> None:
         assert "\u2014" not in prompt
         for token in ("{title_max}", "{description_max}", "{tags_max}", "{tags_min}"):
             assert token not in prompt
+
+
+def test_roundup_prompt_lists_the_diagram_services() -> None:
+    gen, _ = _gen(f"{_HEADER}\n---BODY---\nBody.")
+    roundup = RoundupContext(1, "a", "b", ())
+    prompt = gen.build_prompt(
+        GenerationSpec(campaign_id="c", day=1, topic="AWS news roundup week 1", roundup=roundup)
+    )
+    assert "{diagram_services}" not in prompt
+    assert all(key in prompt for key in ICON_CATALOG)
+    assert "---DIAGRAM---" in prompt
+
+
+def test_news_prompt_forbids_invented_profiles() -> None:
+    assert "Never use `--profile`" in load_prompt_template(("app.prompts", "news_v1.md"))

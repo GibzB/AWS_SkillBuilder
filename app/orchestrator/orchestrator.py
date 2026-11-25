@@ -50,7 +50,7 @@ from app.common.errors import (
     PublicationError,
 )
 from app.common.metrics import MetricName, MetricsEmitter
-from app.diagrams.spec import parse_spec
+from app.diagrams.normalise import normalise_diagram
 from app.generation.generator import ContentGenerator, ThreadTimeoutRunner, TimeoutRunner
 from app.generation.models import Article, GenerationSpec, NewsContext
 from app.news.feed import FeedItem, NewsSource
@@ -81,11 +81,6 @@ _BACKOFF_BASE_SECONDS = 1.0
 PUBLISH_TIMEOUT_SECONDS = 60.0
 # Longest announcement text stored on a day row (news campaign).
 SOURCE_TEXT_MAX = 4000
-# The line where the diagram picture belongs in a news article body.
-_DIAGRAM_MARKER_RE = re.compile(
-    r"^[ \t]*!\[Architecture diagram\]\(diagram\.png\)[ \t]*(?:\n|$)", re.MULTILINE
-)
-
 
 class ExecutionOutcome(str, Enum):
     """The terminal outcome of one Orchestrator run."""
@@ -384,23 +379,8 @@ class Orchestrator:
 
     @staticmethod
     def _normalise_diagram(article: Article) -> Article:
-        """Keep the diagram only when the spec is valid and the marker appears once.
-
-        A bad or missing diagram never fails the article: the spec is cleared
-        and any marker line is removed from the body.
-        """
-        markers = len(_DIAGRAM_MARKER_RE.findall(article.body_markdown))
-        if markers == 1 and parse_spec(article.diagram_json) is not None:
-            return article
-        if markers == 0 and not article.diagram_json:
-            return article
-        return replace(
-            article,
-            diagram_json="",
-            body_markdown=_DIAGRAM_MARKER_RE.sub("", article.body_markdown).rstrip()
-            if markers
-            else article.body_markdown,
-        )
+        """Keep the diagram only when the spec is valid and the marker appears once."""
+        return normalise_diagram(article)
 
     def _persist_generated(
         self, campaign: Campaign, day: CampaignDay, article: Article

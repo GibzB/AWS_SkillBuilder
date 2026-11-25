@@ -30,13 +30,38 @@ person, plain and accurate.
 - Add a section titled "Regional availability" only when `roundup.regional` is
   not empty. List each item as a bullet with a Markdown link using the exact
   `link` from the input. Name nothing that is not in that list.
-- Do NOT write a hands-on section and do NOT include code blocks. No diagram.
+- Do NOT write a hands-on section and do NOT include code blocks.
 - Write in the first person ("This week I covered...", "What stood out to me...").
 - Do NOT claim you deployed, ran or tested anything. Do NOT invent employment,
   projects, incidents, certifications, customers or measurements.
+- Optionally add one high-level architecture overview diagram of the AWS
+  services the week's dailies are about (see the diagram rules). Only draw
+  services that appear in the input, and connect two services only when the
+  input or common practice clearly supports it; leave edges out otherwise.
 - Do not use the long dash character anywhere. Use a comma, a colon or a period.
 - Do not use angle brackets anywhere (no HTML tags, no placeholders).
 - End with a one-sentence takeaway for the week.
+
+# Diagram rules
+
+- A diagram is optional. When you include one, the body must contain exactly one
+  line, by itself, after the intro and before the daily paragraphs:
+
+  ![Architecture diagram](diagram.png)
+
+  and after the body you add a line `---DIAGRAM---` followed by ONE JSON object
+  (no code fence). Provide both or neither.
+- JSON shape:
+
+  {"nodes": [{"id": "bd", "service": "bedrock", "label": "Bedrock"}],
+   "edges": [{"from": "bd", "to": "s3", "label": "stores"}],
+   "groups": [{"id": "g1", "kind": "aws_cloud", "label": "AWS Cloud", "members": ["bd"]}]}
+
+- At most 12 nodes, 16 edges and 6 groups. Labels are at most 24 characters,
+  with no angle brackets. Node ids are short letters and digits.
+- `service` must be one of these keys, nothing else: {diagram_services}
+- `kind` of a group must be one of: aws_cloud, region, vpc, subnet_public,
+  subnet_private. Every edge `from` and `to` must be a node id.
 
 # Length limits (hard constraints)
 
@@ -100,11 +125,15 @@ PART 2: the exact delimiter line:
 
 then the article body as raw Markdown.
 
+PART 3 (only when the body contains the diagram marker line): the exact
+delimiter line `---DIAGRAM---`, then the diagram JSON object.
+
 Rules:
 
 - The metadata JSON must be valid and must NOT contain a body field.
 - Tags must be distinct (ignoring case).
-- Emit `---BODY---` exactly once, on its own line.
+- Emit `---BODY---` exactly once and `---DIAGRAM---` at most once, each on its
+  own line.
 
 Example shape (illustrative):
 

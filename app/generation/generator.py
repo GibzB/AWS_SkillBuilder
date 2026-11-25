@@ -299,6 +299,7 @@ class ContentGenerator:
         }
         if spec.roundup is not None:
             template = load_prompt_template(ROUNDUP_PROMPT_RESOURCE)
+            substitutions["{diagram_services}"] = ", ".join(sorted(ICON_CATALOG))
         elif spec.news is not None:
             template = load_prompt_template(NEWS_PROMPT_RESOURCE)
             substitutions["{diagram_services}"] = ", ".join(sorted(ICON_CATALOG))
