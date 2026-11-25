@@ -136,3 +136,10 @@ def test_network_error_is_unavailable() -> None:
 def test_malformed_xml_is_rejected() -> None:
     with pytest.raises(GenerationError):
         fetch_feed(opener=_Opener(_Response("<?xml version='1.0'?><rss><channel><item>")))
+
+
+def test_non_https_url_is_rejected_before_any_request() -> None:
+    opener = _Opener(_Response(_SAMPLE))
+    with pytest.raises(GenerationError):
+        fetch_feed(opener=opener, url="file:///etc/passwd")
+    assert opener.requests == []

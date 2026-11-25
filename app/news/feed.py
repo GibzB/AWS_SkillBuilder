@@ -111,7 +111,15 @@ def fetch_feed(
     url: str = FEED_URL,
     timeout: float = 20,
 ) -> list[FeedItem]:
-    """Fetch and parse the feed, or raise ``GenerationError(reason="unavailable")``."""
+    """Fetch and parse the feed, or raise ``GenerationError(reason="unavailable")``.
+
+    Only ``https://`` URLs are accepted, because urllib would also open
+    ``file://`` and other schemes.
+    """
+    if not url.startswith("https://"):
+        raise GenerationError(
+            message="news feed URL must use https", reason="unavailable"
+        )
     request = urllib.request.Request(  # noqa: S310 - fixed https URL
         url, headers={"User-Agent": USER_AGENT, "Accept": ACCEPT}
     )
