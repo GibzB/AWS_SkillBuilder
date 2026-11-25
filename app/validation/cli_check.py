@@ -8,7 +8,8 @@ service definitions (the same data the AWS CLI is built from):
 * the service exists,
 * the operation exists on that service,
 * every ``--flag`` is a real parameter of that operation (or a global option),
-* every REQUIRED parameter is present.
+* every REQUIRED parameter is present,
+* any ``--profile`` names a profile in the local AWS config.
 
 This is schema verification, not execution: it proves the command is
 well-formed for the real API without needing credentials or touching any
@@ -17,9 +18,12 @@ account. It never runs the command.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 from botocore import xform_name
 from botocore.session import get_session
@@ -85,6 +89,38 @@ _GLOBAL_FLAGS = {
 }
 
 
+@lru_cache(maxsize=1)
+def known_profiles() -> frozenset[str]:
+    """Return the AWS CLI profile names that exist on this machine.
+
+    Only the ``[section]`` header lines of ``~/.aws/config`` and
+    ``~/.aws/credentials`` are read (honouring ``AWS_CONFIG_FILE`` and
+    ``AWS_SHARED_CREDENTIALS_FILE``); keys and secrets are never parsed or kept.
+    ``default`` is always known. In the Lambda there are no such files, so only
+    ``default`` is known there.
+    """
+    names = {"default"}
+    config = Path(os.environ.get("AWS_CONFIG_FILE", "~/.aws/config")).expanduser()
+    creds = Path(
+        os.environ.get("AWS_SHARED_CREDENTIALS_FILE", "~/.aws/credentials")
+    ).expanduser()
+    for path, prefix in ((config, "profile "), (creds, "")):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            header = re.match(r"^\s*\[([^\]]+)\]\s*$", line)
+            if not header:
+                continue
+            section = header.group(1).strip()
+            if prefix and section.startswith(prefix):
+                names.add(section[len(prefix):].strip())
+            elif not prefix:
+                names.add(section)
+    return frozenset(names)
+
+
 @dataclass(frozen=True)
 class CliIssue:
     """A problem with one command: the command text, a short reason and its kind."""
@@ -142,6 +178,26 @@ def extract_aws_commands(markdown: str) -> list[str]:
     return commands
 
 
+def _unknown_profile(tokens: list[str]) -> str | None:
+    """Return the ``--profile`` value if it names a profile this machine lacks.
+
+    A named profile only runs where it exists, and generated articles must not
+    invent one, so an unknown profile is a hard failure (the repair pass then
+    drops the flag). It is checked before any other rule so custom commands
+    such as ``aws s3 ls`` are covered too.
+    """
+    for index, token in enumerate(tokens):
+        if token == "--profile":
+            value = tokens[index + 1] if index + 1 < len(tokens) else ""
+        elif token.startswith("--profile="):
+            value = token.split("=", 1)[1]
+        else:
+            continue
+        if value and value not in known_profiles():
+            return value
+    return None
+
+
 # Kinds that mean "botocore here may simply be older than the command": the
 # command cannot be verified, which is not proof that it is wrong.
 UNVERIFIABLE_KINDS = frozenset({"unknown_service", "unknown_operation", "unknown_option"})
@@ -152,12 +208,16 @@ def classify_command(command: str) -> tuple[str, str] | None:
 
     ``unknown_service``, ``unknown_operation`` and ``unknown_option`` are
     *unverifiable* (the checker's botocore may predate the command);
-    ``parse``, ``shape`` and ``missing_required`` are hard failures.
+    ``parse``, ``shape``, ``missing_required`` and ``unknown_profile`` are hard
+    failures.
     """
     try:
         tokens = shlex.split(command, comments=True)
     except ValueError as error:
         return ("parse", f"cannot parse command ({error})")
+    unknown = _unknown_profile(tokens)
+    if unknown is not None:
+        return ("unknown_profile", f"profile '{unknown}' is not in the AWS config; remove --profile")
     if len(tokens) >= 2 and tokens[0] == "aws" and tokens[1] in _CUSTOM_SERVICES:
         return None
     if len(tokens) < 3 or tokens[0] != "aws":

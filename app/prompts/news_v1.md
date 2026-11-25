@@ -76,6 +76,9 @@ The body must cover, in this order:
   commands and options with every required option included.
 - Prefer safe, read-only commands (list, describe, get) that a reader can run
   as written. If a command creates something, add the matching delete command.
+- Never use `--profile` and never invent a named profile such as
+  `my-profile`; the reader's default credentials are assumed. A command with a
+  profile that does not exist fails validation.
 - Use concrete example values such as `my-learning-bucket` or `us-east-1`.
   NEVER use angle brackets, curly-brace templates or made-up resource IDs, and
   NEVER write a dummy 12-digit account ID.

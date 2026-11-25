@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from pathlib import Path
+
 import pytest
 
 from app.campaign.models import DayState
 from app.generation.models import Article
 from app.orchestrator.handler import BedrockRuntimeClient
 from app.validation.cli_check import (
+    UNVERIFIABLE_KINDS,
     check_article_commands,
     check_command,
+    classify_command,
     extract_aws_commands,
+    known_profiles,
 )
 from app.validation.validator import ContentValidator
 
@@ -353,3 +359,51 @@ def test_classify_command_ok_and_wrapper_agree() -> None:
 def test_article_issues_carry_the_kind() -> None:
     _, issues = check_article_commands("```bash\naws lambda frobnicate-widgets\n```\n")
     assert [i.kind for i in issues] == ["unknown_operation"]
+
+
+@pytest.fixture
+def profiles(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
+    """Point the checker at temp AWS config files with known profile names."""
+    (tmp_path / "config").write_text("[default]\n[profile work]\n[sso-session s]\n")
+    (tmp_path / "credentials").write_text("[lab]\naws_access_key_id = X\n")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "credentials"))
+    known_profiles.cache_clear()
+    yield
+    known_profiles.cache_clear()
+
+
+@pytest.mark.usefixtures("profiles")
+def test_profiles_come_from_config_and_credentials_headers() -> None:
+    assert known_profiles() >= {"default", "work", "lab"}
+    assert "aws_access_key_id" not in known_profiles()
+
+
+@pytest.mark.usefixtures("profiles")
+@pytest.mark.parametrize(
+    "command",
+    [
+        "aws bedrock list-foundation-models --profile us-gov-geo-cris",
+        "aws s3 ls --profile=nope",
+    ],
+)
+def test_unknown_profile_is_a_hard_failure(command: str) -> None:
+    result = classify_command(command)
+    assert result is not None and result[0] == "unknown_profile"
+    assert "unknown_profile" not in UNVERIFIABLE_KINDS
+
+
+@pytest.mark.usefixtures("profiles")
+@pytest.mark.parametrize("name", ["default", "work", "lab"])
+def test_known_profile_passes(name: str) -> None:
+    assert classify_command(f"aws s3 ls --profile {name}") is None
+
+
+@pytest.mark.usefixtures("profiles")
+def test_news_disclaimer_does_not_excuse_an_unknown_profile() -> None:
+    body = (
+        "Intro.\n\n> **Validate before you run:** confirm these commands.\n\n"
+        "```bash\naws bedrock list-foundation-models --profile us-gov-geo-cris\n```\n"
+    )
+    _, issues = check_article_commands(body)
+    assert [i.kind for i in issues] == ["unknown_profile"]
