@@ -61,6 +61,9 @@ def _feed_item(guid: str, title: str, published: str) -> FeedItem:
     return FeedItem(guid, title, "text", published, (), f"https://aws.amazon.com/r/{guid}/")
 
 
+_BASE_SPEC = '{"nodes": [{"id": "fn", "service": "lambda", "label": "Handler"}], "edges": []}'
+
+
 class Source:
     def __init__(self, items: list[FeedItem] | Exception) -> None:
         self._items = items
@@ -86,7 +89,10 @@ class Generator:
         if self._error is not None:
             raise self._error
         assert spec.roundup is not None
-        lines = ["This week in AWS news I covered a few items."]
+        lines = [
+            "This week in AWS news I covered a few items.",
+            "![Architecture diagram](diagram.png)",
+        ]
         if self._link_all:
             lines += [f"[{d.title}]({d.url})" for d in spec.roundup.dailies]
         if spec.roundup.regional:
@@ -96,7 +102,7 @@ class Generator:
             campaign_id=spec.campaign_id, day=spec.day, topic=spec.topic,
             title=f"AWS news roundup: week {spec.day}", description="The week in AWS news.",
             body_markdown="\n\n".join(lines), tags=("aws",), learning_takeaway="A busy week.",
-            kind="roundup",
+            kind="roundup", diagram_json=_BASE_SPEC,
         )
 
     def revise(self, spec: GenerationSpec, draft: Article, problems: list[str]) -> Article:
@@ -372,11 +378,7 @@ class DiagramGenerator(Generator):
         from dataclasses import replace
 
         article = super().generate(spec)
-        return replace(
-            article,
-            body_markdown=f"{article.body_markdown}\n\n{_MARKER}",
-            diagram_json=self._diagram,
-        )
+        return replace(article, diagram_json=self._diagram)
 
 
 def test_roundup_keeps_and_stores_a_valid_diagram() -> None:
@@ -392,8 +394,10 @@ def test_roundup_keeps_and_stores_a_valid_diagram() -> None:
 def test_roundup_drops_an_invalid_diagram_and_still_publishes() -> None:
     store, cid = _week2_store()
     pub = Publisher()
-    result = _runner(store, DiagramGenerator("not json"), pub, Source([]), FakeSNSClient()).run(cid)
+    gen = DiagramGenerator("not json")
+    result = _runner(store, gen, pub, Source([]), FakeSNSClient()).run(cid)
     assert result.outcome is RoundupOutcome.PUBLISHED
+    assert len(gen.specs) == 2  # the missing diagram triggered one repair attempt
     assert pub.articles[0].diagram_json == "" and "diagram.png" not in pub.articles[0].body_markdown
     week = store.get_week(cid, 2)
     assert week is not None and week.diagram_json == ""

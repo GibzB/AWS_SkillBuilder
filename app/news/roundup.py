@@ -43,7 +43,11 @@ from app.generation.models import (
 from app.news.feed import FeedItem, NewsSource, is_regional
 from app.notify.notifier import NotificationContext, Notifier
 from app.publishing.adapter import PublishingAdapter
-from app.validation.validator import ContentValidator, ValidationResult
+from app.validation.validator import (
+    ContentValidator,
+    ValidationResult,
+    without_soft_violations,
+)
 
 __all__ = ["RoundupOutcome", "RoundupResult", "RoundupRunner", "week_window"]
 
@@ -228,17 +232,18 @@ class RoundupRunner:
             return article, result
         revise = getattr(self._generator, "revise", None)
         if not callable(revise):
-            return article, result
+            return article, without_soft_violations(result)
         try:
             revised = normalise_diagram(
                 revise(spec, article, [v.message for v in result.violations])
             )
         except GenerationError:
-            return article, result
+            return article, without_soft_violations(result)
         revised_result = self._validator.validate(revised, topic, None, roundup=context)
         if revised_result.is_valid:
             return revised, revised_result
-        return article, result
+        # A diagram the repair could not add never blocks the roundup.
+        return article, without_soft_violations(result)
 
     def _fail(
         self, campaign: Campaign, week: int, topic: str, stage: str, reason: str

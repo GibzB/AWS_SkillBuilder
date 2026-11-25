@@ -252,3 +252,58 @@ def test_non_news_campaign_never_calls_the_feed() -> None:
     assert gen.specs[0].news is None
     day = store.get_day(cid, 1)
     assert day is not None and day.source_guid == ""
+
+
+class DiagramOnlyValidator:
+    """Reports DIAGRAM_MISSING when the article has no diagram, nothing else."""
+
+    def validate(
+        self, article: Article, approved_topic: str, existing: object, *, source: Any = None
+    ) -> ValidationResult:
+        from app.validation.validator import DIAGRAM_MISSING, ValidationViolation
+
+        if article.diagram_json:
+            return ValidationResult(is_valid=True, violations=())
+        violation = ValidationViolation(DIAGRAM_MISSING, "body_markdown", "add a diagram")
+        return ValidationResult(is_valid=False, violations=(violation,))
+
+
+class RevisingNewsGenerator(NewsGenerator):
+    def __init__(self, revised_diagram: str) -> None:
+        super().__init__(body="No diagram yet.")
+        self.revisions = 0
+        self._revised_diagram = revised_diagram
+
+    def revise(self, spec: GenerationSpec, draft: Article, problems: list[str]) -> Article:
+        from dataclasses import replace
+
+        self.revisions += 1
+        if not self._revised_diagram:
+            return draft
+        return replace(
+            draft,
+            body_markdown=f"Intro.\n\n{MARKER}\n\nMore.",
+            diagram_json=self._revised_diagram,
+        )
+
+
+def test_missing_diagram_triggers_repair_that_adds_it() -> None:
+    store, manager, cid = _setup(days=1)
+    gen, publisher = RevisingNewsGenerator(GOOD_DIAGRAM), RecordingPublisher()
+    result = _orch(
+        store, manager, gen, FakeSource(ITEMS), DiagramOnlyValidator(), publisher
+    ).execute(cid)
+    assert result.outcome is ExecutionOutcome.PUBLISHED
+    assert gen.revisions == 1
+    assert publisher.articles[0].diagram_json == GOOD_DIAGRAM
+
+
+def test_missing_diagram_after_repair_still_publishes() -> None:
+    store, manager, cid = _setup(days=1)
+    gen, publisher = RevisingNewsGenerator(""), RecordingPublisher()
+    result = _orch(
+        store, manager, gen, FakeSource(ITEMS), DiagramOnlyValidator(), publisher
+    ).execute(cid)
+    assert result.outcome is ExecutionOutcome.PUBLISHED
+    assert gen.revisions == 1
+    assert publisher.articles[0].diagram_json == ""

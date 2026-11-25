@@ -29,6 +29,8 @@ DISCLAIMER = (
 )
 GOOD_CMD = "aws lambda list-functions"
 NEW_CMD = "aws lambda frobnicate-widgets --widget-id w1"
+MARKER = "![Architecture diagram](diagram.png)"
+SPEC = '{"nodes": [{"id": "fn", "service": "lambda", "label": "Handler"}], "edges": []}'
 LAST = f"Read the announcement: [AWS Lambda adds a thing]({LINK})"
 
 
@@ -43,16 +45,22 @@ def _body(cmd: str | None = GOOD_CMD, disclaimer: bool = False, last: str = LAST
     return "\n\n".join(p for p in parts if p)
 
 
-def _article(body: str, title: str = "Lambda change", description: str = "A short note on Lambda.") -> Article:
+def _article(
+    body: str,
+    title: str = "Lambda change",
+    description: str = "A short note on Lambda.",
+    diagram: bool = True,
+) -> Article:
     return Article(
         campaign_id="aws-news-30",
         day=1,
         topic=NEWS.title,
         title=title,
         description=description,
-        body_markdown=body,
+        body_markdown=f"{MARKER}\n\n{body}" if diagram else body,
         tags=("lambda",),
         learning_takeaway="I learned something.",
+        diagram_json=SPEC if diagram else "",
     )
 
 
@@ -158,17 +166,18 @@ ROUNDUP = RoundupContext(
 )
 
 
-def _roundup_article(body: str) -> Article:
+def _roundup_article(body: str, diagram: bool = True) -> Article:
     return Article(
         campaign_id="aws-news-30",
         day=1,
         topic="AWS news roundup week 1",
         title="AWS news roundup: week 1",
         description="This week in AWS news.",
-        body_markdown=body,
+        body_markdown=f"{MARKER}\n\n{body}" if diagram else body,
         tags=("aws",),
         learning_takeaway="A busy week.",
         kind="roundup",
+        diagram_json=SPEC if diagram else "",
     )
 
 
@@ -213,3 +222,42 @@ def test_roundup_regional_section_with_no_provided_items() -> None:
 
 def test_roundup_em_dash_fails() -> None:
     assert "EM_DASH" in _roundup_codes(_GOOD_ROUNDUP + "\n\nA\u2014B")
+
+
+def test_news_article_without_a_diagram_is_flagged_as_soft() -> None:
+    from app.validation.validator import DIAGRAM_MISSING, without_soft_violations
+
+    result = ContentValidator(require_cli_example=True).validate(
+        _article(_body(), diagram=False), NEWS.title, None, source=NEWS
+    )
+    assert {v.code for v in result.violations} == {DIAGRAM_MISSING}
+    assert without_soft_violations(result).is_valid
+
+
+def test_news_article_with_an_invalid_spec_is_flagged() -> None:
+    article = replace(_article(_body()), diagram_json="not json")
+    assert "DIAGRAM_MISSING" in _codes(article)
+
+
+def test_news_article_with_two_markers_is_flagged() -> None:
+    article = _article(f"{MARKER}\n\n{_body()}")
+    assert "DIAGRAM_MISSING" in _codes(article)
+
+
+def test_roundup_without_a_diagram_is_flagged() -> None:
+    result = ContentValidator(require_cli_example=True).validate(
+        _roundup_article(_GOOD_ROUNDUP, diagram=False),
+        "AWS news roundup week 1", None, roundup=ROUNDUP,
+    )
+    assert {v.code for v in result.violations} == {"DIAGRAM_MISSING"}
+
+
+def test_hard_violations_survive_without_soft_violations() -> None:
+    from app.validation.validator import without_soft_violations
+
+    result = ContentValidator(require_cli_example=True).validate(
+        _article(_body(NEW_CMD), diagram=False), NEWS.title, None, source=NEWS
+    )
+    kept = without_soft_violations(result)
+    assert not kept.is_valid
+    assert {v.code for v in kept.violations} == {"CLI_UNVERIFIED_NO_DISCLAIMER"}

@@ -101,16 +101,16 @@ The body must cover, in this order:
 
 # Diagram rules
 
-- A diagram is optional. Include one only if it clarifies how the feature fits
-  into an architecture.
-- When you include one, the body must contain exactly one line, by itself,
-  before the "Try it yourself" section:
+- A diagram is REQUIRED. Every article has one architecture diagram showing
+  how the feature fits into a small, typical architecture.
+- The body must contain exactly one line, by itself, before the "Try it
+  yourself" section:
 
   ![Architecture diagram](diagram.png)
 
   and after the body you add a line `---DIAGRAM---` followed by ONE JSON object
-  (no code fence) describing the diagram. Use the exact marker line above only
-  when you also provide the JSON. If the diagram adds nothing, omit both.
+  (no code fence) describing the diagram. Always provide both the marker line
+  and the JSON; an article without them is sent back for revision.
 - JSON shape:
 
   {"nodes": [{"id": "user1", "service": "user", "label": "Reader"},
@@ -201,8 +201,7 @@ PART 2: the exact delimiter line:
 
 then the article body as raw Markdown, ending with the announcement link line.
 
-PART 3 (only when the body contains the diagram marker line): the exact
-delimiter line:
+PART 3 (always): the exact delimiter line:
 
 ---DIAGRAM---
 
@@ -212,7 +211,7 @@ Rules:
 
 - The metadata JSON must be valid and must NOT contain a body field.
 - Tags must be distinct (ignoring case).
-- Emit `---BODY---` exactly once and `---DIAGRAM---` at most once, each on its
+- Emit `---BODY---` exactly once and `---DIAGRAM---` exactly once, each on its
   own line.
 - Stay strictly on the announcement in `news`.
 

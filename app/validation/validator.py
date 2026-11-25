@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from markdown_it import MarkdownIt
 
 from app.campaign.models import DayState
+from app.diagrams.normalise import DIAGRAM_MARKER_RE
+from app.diagrams.spec import parse_spec
 from app.generation.models import (
     TAGS_MAX,
     TAGS_MIN,
@@ -45,7 +47,16 @@ __all__ = [
     "ValidationViolation",
     "ValidationResult",
     "ContentValidator",
+    "DIAGRAM_MISSING",
+    "without_soft_violations",
 ]
+
+# News campaign: every daily and roundup should carry one architecture diagram.
+# A missing or invalid diagram is reported so the one-shot repair asks for it,
+# but it is SOFT: if the repair cannot fix it, the article still publishes
+# without a diagram (a diagram never blocks generation).
+DIAGRAM_MISSING = "DIAGRAM_MISSING"
+SOFT_CODES = frozenset({DIAGRAM_MISSING})
 
 _TITLE_MAX = 255
 _DESCRIPTION_MAX = 512
@@ -547,6 +558,7 @@ class ContentValidator:
     ) -> None:
         """Rules for a daily news article (see the news_v1 prompt)."""
         _check_em_dash(article, violations)
+        _check_diagram(article, violations)
         if not _last_line_links_to(article.body_markdown, source.link):
             violations.append(
                 ValidationViolation(
@@ -575,6 +587,7 @@ class ContentValidator:
     ) -> None:
         """Rules for a weekly roundup article."""
         _check_em_dash(article, violations)
+        _check_diagram(article, violations)
         body = article.body_markdown
         for daily in roundup.dailies:
             candidates = [u for u in (daily.url, daily.source_link) if u]
@@ -627,6 +640,29 @@ class ContentValidator:
             return True
         content = f"{article.title}\n{article.body_markdown}".casefold()
         return any(word in content for word in significant)
+
+
+def without_soft_violations(result: ValidationResult) -> ValidationResult:
+    """Drop soft violations (a missing diagram) once repair has had its chance."""
+    hard = tuple(v for v in result.violations if v.code not in SOFT_CODES)
+    return ValidationResult(is_valid=not hard, violations=hard)
+
+
+def _check_diagram(article: Article, violations: list[ValidationViolation]) -> None:
+    """Require exactly one diagram marker line and a valid diagram spec."""
+    markers = len(DIAGRAM_MARKER_RE.findall(article.body_markdown))
+    if markers == 1 and parse_spec(article.diagram_json) is not None:
+        return
+    violations.append(
+        ValidationViolation(
+            DIAGRAM_MISSING,
+            "body_markdown",
+            "the article needs one architecture diagram: put the line "
+            "'![Architecture diagram](diagram.png)' once in the body and add "
+            "'---DIAGRAM---' after the body followed by a valid diagram JSON "
+            "object using only the allowed service keys",
+        )
+    )
 
 
 def _has_disclaimer(body: str) -> bool:

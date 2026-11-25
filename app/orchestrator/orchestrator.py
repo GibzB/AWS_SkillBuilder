@@ -57,7 +57,11 @@ from app.news.feed import FeedItem, NewsSource
 from app.news.selection import FUNDAMENTAL_KEYS, select_item, service_of
 from app.notify.notifier import NotificationContext, Notifier
 from app.publishing.adapter import PublicationResult, PublishingAdapter
-from app.validation.validator import ContentValidator, ValidationResult
+from app.validation.validator import (
+    ContentValidator,
+    ValidationResult,
+    without_soft_violations,
+)
 
 __all__ = [
     "MAX_PUBLISH_ATTEMPTS",
@@ -285,6 +289,9 @@ class Orchestrator:
             if repaired is not None:
                 article, result = repaired
                 self._persist_generated(campaign, day, article)
+            else:
+                # A diagram the repair could not add never blocks the article.
+                result = without_soft_violations(result)
         if not result.is_valid:
             reason = "; ".join(v.message for v in result.violations)
             return self._fail(

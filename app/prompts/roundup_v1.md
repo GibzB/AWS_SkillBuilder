@@ -25,8 +25,11 @@ person, plain and accurate.
   paragraph per daily article: what the announcement was and why it matters, in
   your own words, followed by a link to the builder's article using the exact
   `url` from the input as a Markdown link.
-- Include the announcement link of each daily as well, as "Announcement:" with
-  the exact `source_link` from the input, when it is not empty.
+- Include the announcement link of each daily as well, as
+  "Announcement: [announcement](source_link)" with the exact `source_link` from
+  the input, when it is not empty. Do not label it with a blog or source name.
+- Do not name weekdays or dates for the dailies ("On Monday..."). The input
+  does not say which day each was published; refer to them by topic.
 - Add a section titled "Regional availability" only when `roundup.regional` is
   not empty. List each item as a bullet with a Markdown link using the exact
   `link` from the input. Name nothing that is not in that list.
@@ -34,8 +37,8 @@ person, plain and accurate.
 - Write in the first person ("This week I covered...", "What stood out to me...").
 - Do NOT claim you deployed, ran or tested anything. Do NOT invent employment,
   projects, incidents, certifications, customers or measurements.
-- Optionally add one high-level architecture overview diagram of the AWS
-  services the week's dailies are about (see the diagram rules). Only draw
+- Add one high-level architecture overview diagram of the AWS services the
+  week's dailies are about (see the diagram rules); it is required. Only draw
   services that appear in the input, and connect two services only when the
   input or common practice clearly supports it; leave edges out otherwise.
 - Do not use the long dash character anywhere. Use a comma, a colon or a period.
@@ -44,13 +47,14 @@ person, plain and accurate.
 
 # Diagram rules
 
-- A diagram is optional. When you include one, the body must contain exactly one
-  line, by itself, after the intro and before the daily paragraphs:
+- A diagram is REQUIRED. The body must contain exactly one line, by itself,
+  after the intro and before the daily paragraphs:
 
   ![Architecture diagram](diagram.png)
 
   and after the body you add a line `---DIAGRAM---` followed by ONE JSON object
-  (no code fence). Provide both or neither.
+  (no code fence). Always provide both; a roundup without them is sent back
+  for revision.
 - JSON shape:
 
   {"nodes": [{"id": "bd", "service": "bedrock", "label": "Bedrock"}],
@@ -125,14 +129,14 @@ PART 2: the exact delimiter line:
 
 then the article body as raw Markdown.
 
-PART 3 (only when the body contains the diagram marker line): the exact
-delimiter line `---DIAGRAM---`, then the diagram JSON object.
+PART 3 (always): the exact delimiter line `---DIAGRAM---`, then the diagram
+JSON object.
 
 Rules:
 
 - The metadata JSON must be valid and must NOT contain a body field.
 - Tags must be distinct (ignoring case).
-- Emit `---BODY---` exactly once and `---DIAGRAM---` at most once, each on its
+- Emit `---BODY---` exactly once and `---DIAGRAM---` exactly once, each on its
   own line.
 
 Example shape (illustrative):
