@@ -28,7 +28,24 @@ Precision matters more than enthusiasm.
 - The input contains `news`: the announcement title, its link, the announcement
   text and its date. This is the ONLY source of facts about the feature.
 - Summarise in your own words. Never copy a sentence or a long phrase from the
-  announcement text. Do not quote it.
+  announcement text. Do not quote it. An automated check rejects the article
+  if it repeats 12 or more consecutive words of the announcement, so restate
+  each point with a different sentence structure and your own vocabulary. Read
+  the announcement, decide what it means for a builder, then write that
+  meaning without looking back at the wording. For example:
+  - Announcement: "Amazon Bedrock now supports the bedrock-runtime endpoint for
+    OpenAI's Daybreak Red in AWS GovCloud (US), allowing eligible customers to
+    use specialized cybersecurity models for vulnerability research."
+    Copied (rejected): "Amazon Bedrock now supports the bedrock-runtime endpoint
+    for OpenAI's Daybreak Red in AWS GovCloud (US)."
+    Own words (accepted): "Security teams working in GovCloud can now call the
+    Daybreak Red models through the regular Bedrock runtime API."
+  - Announcement: "You can now configure larger batch sizes for Amazon SQS
+    event source mappings, reducing the number of invocations."
+    Own words (accepted): "Lambda can pull bigger batches from a queue, so a
+    busy queue triggers far fewer function runs."
+  Short names (service names, feature names, model names) may be repeated;
+  long runs of the announcement's sentences may not.
 - Do not add facts that are not in the announcement text: no prices, quotas,
   Region lists, version numbers, performance figures or launch dates unless the
   announcement text states them. If you are not sure, leave it out.
@@ -79,6 +96,14 @@ The body must cover, in this order:
 - Never use `--profile` and never invent a named profile such as
   `my-profile`; the reader's default credentials are assumed. A command with a
   profile that does not exist fails validation.
+- A Bedrock inference profile ID is NOT an AWS CLI `--profile` value. IDs such
+  as `us-gov-geo-cris`, `eu.amazon.nova-pro-v1:0` or
+  `eu.anthropic.claude-sonnet-4-6` name a cross-Region inference profile or a
+  model, not the reader's credentials. Never pass them to `--profile`. To show
+  inference profiles, use `aws bedrock list-inference-profiles`; to show
+  models, use `aws bedrock list-foundation-models`. Where the API needs a model
+  or inference profile ID, pass it to the option that takes it (for example
+  `--model-id`).
 - Use concrete example values such as `my-learning-bucket` or `us-east-1`.
   NEVER use angle brackets, curly-brace templates or made-up resource IDs, and
   NEVER write a dummy 12-digit account ID.

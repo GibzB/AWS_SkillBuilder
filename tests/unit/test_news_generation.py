@@ -173,4 +173,13 @@ def test_roundup_prompt_lists_the_diagram_services() -> None:
 
 
 def test_news_prompt_forbids_invented_profiles() -> None:
-    assert "Never use `--profile`" in load_prompt_template(("app.prompts", "news_v1.md"))
+    prompt = load_prompt_template(("app.prompts", "news_v1.md"))
+    assert "Never use `--profile`" in prompt
+    assert "inference profile ID is NOT an AWS CLI `--profile`" in prompt
+    assert "us-gov-geo-cris" in prompt and "eu.anthropic.claude-sonnet-4-6" in prompt
+
+
+def test_news_prompt_explains_the_no_copy_rule_with_examples() -> None:
+    prompt = load_prompt_template(("app.prompts", "news_v1.md"))
+    assert "12 or more consecutive words" in prompt
+    assert "Copied (rejected)" in prompt and "Own words (accepted)" in prompt
