@@ -21,6 +21,7 @@ dist/
 *.tfstate.*
 *.tfvars
 !config/example.tfvars
+!config/example-news.tfvars
 crash.log
 
 # Secrets - never commit

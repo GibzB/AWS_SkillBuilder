@@ -212,6 +212,64 @@ mechanism was confirmed, so:
   session capture, confirmation that automation is permitted, and an explicit
   configuration choice.
 
+## News campaign (aws-news-30)
+
+A second campaign, `aws-news-30`, turns the AWS What's New feed into 30 daily
+articles and a Sunday roundup. It runs as its own stack with its own Terraform
+workspace, so `aws-learning-21` is not touched.
+
+**How a day is chosen.** On the day, the Lambda reads the feed
+(`https://aws.amazon.com/about-aws/whats-new/recent/feed/`) and picks one item.
+About 65% of picks favour services covered by the earlier published articles.
+Regional-availability announcements are never a daily topic; they only appear in
+the weekly roundup. Each article gives a summary in the builder's own words, what
+the feature is for and its value, a few use cases, a hands-on section, an
+architecture diagram when one helps, and the announcement link on the last line.
+When a command is too new to verify against the installed AWS CLI, the article
+carries a `> **Validate before you run:**` note above the command.
+
+**Schedules.** The daily run uses `schedule_time`. The weekly roundup runs on
+Sundays at `weekly_roundup_time` (default 18:00, campaign timezone) and only
+exists when `weekly_roundup_enabled = true`; it defaults to false, so existing
+stacks plan as a no-op.
+
+**Commands.**
+
+```bash
+# Deploy (plan first; apply only after reviewing the plan)
+cp config/example-news.tfvars config/news-campaign.tfvars
+scripts/deploy.sh default --tfvars config/news-campaign.tfvars \
+  --workspace-suffix aws-news-30 --email you@your-domain --plan-only
+
+# Create and approve the campaign (generates nothing; use --through N to generate N days now)
+python tools/bootstrap_campaign.py --news --email you@your-domain
+
+# Run the roundup once, for the current week or a given one
+python tools/bootstrap_campaign.py --roundup --week 1
+
+# Draft in Builder Center (daily, then weekly)
+scripts/run.sh publish --news --from N --to N --auto-tags
+scripts/run.sh publish --news --week N --auto-tags
+
+# Track progress; W rows never change the daily streak
+scripts/run.sh progress --doc docs/news-campaign-progress.md --day N --state published
+scripts/run.sh progress --doc docs/news-campaign-progress.md --week N --state published
+```
+
+`scripts/deploy.sh` without `--tfvars` and `--workspace-suffix` behaves as
+before (config `config/my-campaign.tfvars`, workspace `acct-<account id>`).
+
+**Diagrams.** The Lambda stores a small JSON diagram spec with the article.
+`tools/diagrams/render.py` turns it into a draw.io file with AWS icons and
+exports a PNG, and `publish --news` uploads the PNG through the editor's Image
+button. PNG export needs the draw.io desktop CLI (`brew install --cask drawio`);
+without it only the `.drawio` file is written, and you can open it with the
+draw.io MCP in an interactive session. The S3 copy of an article shows a broken
+image at the diagram marker because the PNG is only uploaded to Builder Center.
+
+**Publish stays manual.** The tools fill the editor and upload the diagram.
+Clicking Publish, and every like, comment, reply and vote, is always yours.
+
 ## Security
 
 - Least-privilege IAM, scoped separately for DynamoDB, Bedrock, Secrets Manager,
@@ -245,9 +303,10 @@ mechanism was confirmed, so:
 
 ```text
 app/            application code (campaign, generation, validation, publishing,
-                notify, orchestrator, common)
+                notify, orchestrator, common, news, diagrams)
+tools/          local tools (builder_publish, diagrams, bootstrap_campaign.py)
 infra/          Terraform (DynamoDB, Lambda, Function URL, Scheduler, SNS, IAM)
-config/         example.tfvars (placeholders only)
+config/         example.tfvars, example-news.tfvars (placeholders only)
 tests/          unit, property, and integration tests
 .kiro/specs/    requirements.md, design.md, tasks.md
 ```

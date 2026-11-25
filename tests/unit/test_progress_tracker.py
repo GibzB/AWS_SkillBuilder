@@ -212,3 +212,91 @@ def test_mark_drafted_only_ticks_draft(tmp_path: Path) -> None:
     cells = pt._split_row([ln for ln in text.splitlines() if ln.startswith("| 6 ")][0])
     assert pt.CHECK in cells[pt.COL_DRAFT]
     assert pt.UNCHECK in cells[pt.COL_PUBLISHED]  # not published yet
+
+
+# ----------------------------- news doc / W rows ---------------------------- #
+
+
+def _week_row(week: int, published: bool = False) -> str:
+    p = pt.CHECK if published else pt.UNCHECK
+    return f"| W{week} | Weekly roundup {week} | ⬜ | ⬜ | {p} | {pt.BROKEN} | |\n"
+
+
+def test_week_row_is_not_a_data_row() -> None:
+    line = _week_row(1)
+    assert pt._is_week_row(line)
+    assert not pt._is_data_row(line)
+    assert not pt._is_week_row(_row(1, False, False, pt.BROKEN))
+
+
+def test_published_week_row_never_changes_streak_or_banner() -> None:
+    rows = _row(1, True, True, f"{pt.FIRE} 1") + _row(2, False, False, pt.BROKEN)
+    doc = _doc(rows + _week_row(1) + _week_row(2))
+    before_streak = pt.current_streak(doc)
+    out = pt.set_week_cell(doc, 1, pt.COL_PUBLISHED, pt.CHECK)
+    out = pt.set_week_cell(out, 1, pt.COL_DRAFT, pt.CHECK)
+    assert pt.current_streak(out) == before_streak == 1
+    assert pt.recompute_streak(out) == out
+    assert pt._published_days(out) == {1}
+    assert out.splitlines()[0] == doc.splitlines()[0]
+
+
+def test_set_week_cell_only_touches_the_week_row() -> None:
+    doc = _doc(_row(1, False, False, pt.BROKEN) + _week_row(1) + _week_row(2))
+    out = pt.set_week_cell(doc, 2, pt.COL_DRAFT, pt.CHECK)
+    w1 = [ln for ln in out.splitlines() if ln.startswith("| W1 ")][0]
+    w2 = [ln for ln in out.splitlines() if ln.startswith("| W2 ")][0]
+    assert pt.UNCHECK in pt._split_row(w1)[pt.COL_DRAFT]
+    assert pt.CHECK in pt._split_row(w2)[pt.COL_DRAFT]
+    assert [ln for ln in out.splitlines() if ln.startswith("| 1 ")] == [
+        ln for ln in doc.splitlines() if ln.startswith("| 1 ")
+    ]
+
+
+def test_set_week_cell_missing_row_raises() -> None:
+    with pytest.raises(ValueError):
+        pt.set_week_cell(_doc(_week_row(1)), 3, pt.COL_DRAFT, pt.CHECK)
+
+
+def test_week_wrappers_edit_file_and_leave_daily_rows(tmp_path: Path) -> None:
+    doc = tmp_path / "news.md"
+    text = _doc(_row(1, False, False, pt.BROKEN) + _week_row(1))
+    doc.write_text(text, encoding="utf-8")
+    pt.mark_week_drafted(1, doc)
+    pt.mark_week_published(1, doc)
+    out = doc.read_text(encoding="utf-8")
+    w1 = [ln for ln in out.splitlines() if ln.startswith("| W1 ")][0]
+    cells = pt._split_row(w1)
+    assert pt.CHECK in cells[pt.COL_DRAFT] and pt.CHECK in cells[pt.COL_PUBLISHED]
+    assert [ln for ln in out.splitlines() if ln.startswith("| 1 ")] == [
+        ln for ln in text.splitlines() if ln.startswith("| 1 ")
+    ]
+
+
+def test_cli_week_flag(tmp_path: Path) -> None:
+    doc = tmp_path / "news.md"
+    doc.write_text(_doc(_week_row(2)), encoding="utf-8")
+    assert pt.main(["--week", "2", "--state", "published", "--doc", str(doc)]) == 0
+    assert pt.CHECK in pt._split_row(
+        [ln for ln in doc.read_text(encoding="utf-8").splitlines() if ln.startswith("| W2 ")][0]
+    )[pt.COL_PUBLISHED]
+
+
+def test_log_publish_records_only_for_real_docs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    import engagement_store
+
+    monkeypatch.setattr(engagement_store, "record_action", lambda a: calls.append(a))
+    pt._log_publish(tmp_path / "x.md")
+    assert calls == []
+    pt._log_publish(pt.NEWS_DOC_PATH)
+    assert calls == ["publish"]
+
+
+def test_real_news_doc_has_30_days_and_week_rows() -> None:
+    text = pt.NEWS_DOC_PATH.read_text(encoding="utf-8")
+    days = [ln for ln in text.splitlines() if pt._is_data_row(ln)]
+    weeks = [ln for ln in text.splitlines() if pt._is_week_row(ln)]
+    assert len(days) == 30
+    assert [pt._week_of(w) for w in weeks] == [1, 2, 3, 4, 5]
+    assert pt.current_streak(text) == 0

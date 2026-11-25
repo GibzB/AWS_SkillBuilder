@@ -8,6 +8,10 @@ re-run: use --skip-create to resume, and days already PUBLISHED are skipped.
     AWS_PROFILE=default python tools/bootstrap_campaign.py --email you@example.com
     AWS_PROFILE=default python tools/bootstrap_campaign.py --skip-create --days 21
 
+News campaign (aws-news-30): --news creates and approves the campaign with
+placeholder topics and generates nothing (one day is generated per scheduled
+run, or pass --through N). --roundup [--week N] runs the weekly roundup once.
+
 The email is passed in (never hardcoded) because this repo is public.
 """
 from __future__ import annotations
@@ -21,6 +25,31 @@ from typing import Any
 import boto3
 
 from app.topics.planner import TopicPlanner
+
+
+NEWS_CAMPAIGN = "aws-news-30"
+NEWS_NAME = "30 Days of AWS News"
+NEWS_DAYS = 30
+
+
+def _news_topics(days: int) -> list[str]:
+    """Placeholder topics; the real topic is chosen from the feed on the day."""
+    return [
+        f"News day {n}: topic chosen from the AWS What's New feed on the day"
+        for n in range(1, days + 1)
+    ]
+
+
+def _roundup_event(campaign: str, week: int | None) -> dict[str, Any]:
+    """The direct-invoke event for the weekly roundup (same shape as the schedule)."""
+    event: dict[str, Any] = {
+        "source": "eventbridge-scheduler",
+        "campaign_id": campaign,
+        "kind": "weekly_roundup",
+    }
+    if week is not None:
+        event["week"] = week
+    return event
 
 
 def _ts() -> str:
@@ -162,9 +191,9 @@ def _extend(ddb: Any, table: str, campaign: str, new_total: int, topics: list[st
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Create + run a campaign end to end.")
-    p.add_argument("--campaign", default="aws-learning-21")
-    p.add_argument("--name", default="21 Days of AWS: What I Learned Building with the Cloud")
-    p.add_argument("--days", type=int, default=21)
+    p.add_argument("--campaign", default=None)
+    p.add_argument("--name", default=None)
+    p.add_argument("--days", type=int, default=None)
     p.add_argument("--region", default="eu-west-1")
     p.add_argument("--email", default="", help="Notification email (required unless --skip-create).")
     p.add_argument("--timezone", default="Africa/Nairobi")
@@ -207,12 +236,44 @@ def main() -> int:
         default=[],
         help="Topic for one extended day (repeat; in day order, ending at --extend-to).",
     )
+    p.add_argument(
+        "--news",
+        action="store_true",
+        help=f"Use the news campaign: id {NEWS_CAMPAIGN}, {NEWS_DAYS} days, content_style "
+        "news, placeholder topics. Creates and approves it; generates only with --through N.",
+    )
+    p.add_argument(
+        "--roundup",
+        action="store_true",
+        help="Run the weekly roundup once (invokes the Lambda with the weekly_roundup event).",
+    )
+    p.add_argument(
+        "--week",
+        type=int,
+        default=None,
+        metavar="N",
+        help="With --roundup: the week number (default: the week of today).",
+    )
     args = p.parse_args()
+    if args.news or args.roundup:
+        args.campaign = args.campaign or NEWS_CAMPAIGN
+    if args.news:
+        args.name = args.name or NEWS_NAME
+        args.days = args.days or NEWS_DAYS
+    args.campaign = args.campaign or "aws-learning-21"
+    args.name = args.name or "21 Days of AWS: What I Learned Building with the Cloud"
+    args.days = args.days or 21
+    if args.week is not None and not args.roundup:
+        p.error("--week only applies with --roundup")
+    if args.week is not None and args.week < 1:
+        p.error("--week must be a positive integer")
+    if args.roundup and (args.news or args.reset or args.regenerate_from or args.extend_to):
+        p.error("--roundup cannot be combined with other actions")
     if args.regenerate_from or args.extend_to:
         args.skip_create = True
     if args.extend_to and not args.topic:
         p.error("--extend-to needs at least one --topic")
-    through = args.through or args.days
+    through = args.through or (0 if args.news else args.days)
 
     function = f"aws-builder-{args.campaign}-orchestrator"
     table = f"aws-builder-{args.campaign}-campaign"
@@ -220,6 +281,9 @@ def main() -> int:
     ddb = boto3.client("dynamodb", region_name=args.region)
     account = boto3.client("sts").get_caller_identity()["Account"]
     print(f"Account: {account}  region: {args.region}")
+    if args.roundup:
+        print("roundup:", _invoke(lam, function, _roundup_event(args.campaign, args.week)))
+        return 0
 
     if args.reset:
         if args.skip_create:
@@ -238,7 +302,7 @@ def main() -> int:
     if not args.skip_create:
         if not args.email:
             p.error("--email is required when creating a campaign")
-        topics = TopicPlanner().propose(args.days)
+        topics = _news_topics(args.days) if args.news else TopicPlanner().propose(args.days)
         create = {
             "authenticated": True,
             "action": "create",
@@ -253,6 +317,7 @@ def main() -> int:
                 "timezone": args.timezone,
                 "topics": topics,
                 "notification_email": args.email,
+                **({"content_style": "news"} if args.news else {}),
             },
         }
         print("create :", _invoke(lam, function, create))
@@ -265,6 +330,9 @@ def main() -> int:
         }
         print("approve:", _invoke(lam, function, approve))
 
+    if through == 0:
+        print("Created. No days generated: the daily schedule generates one each morning.")
+        return 0
     sched = {"source": "eventbridge-scheduler", "campaign_id": args.campaign}
     for day in range(1, through + 1):
         state = _day_item(ddb, table, args.campaign, day).get("day_state", {}).get("S")

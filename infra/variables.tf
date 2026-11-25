@@ -239,3 +239,20 @@ variable "monthly_budget_usd" {
     error_message = "monthly_budget_usd must be zero (disabled) or a positive number of US dollars."
   }
 }
+
+variable "weekly_roundup_enabled" {
+  description = "When true, create a Sunday EventBridge Scheduler schedule that builds the weekly news roundup. Off by default so existing stacks plan as a no-op."
+  type        = bool
+  default     = false
+}
+
+variable "weekly_roundup_time" {
+  description = "Weekly roundup time on Sunday in 24-hour HH:MM format, evaluated in the campaign timezone."
+  type        = string
+  default     = "18:00"
+
+  validation {
+    condition     = can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]$", var.weekly_roundup_time))
+    error_message = "weekly_roundup_time must be in 24-hour HH:MM format, for example 18:00."
+  }
+}

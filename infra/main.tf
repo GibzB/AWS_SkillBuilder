@@ -431,3 +431,31 @@ resource "aws_scheduler_schedule" "daily" {
     })
   }
 }
+
+# Weekly news roundup: only created when weekly_roundup_enabled is true, so a
+# plan against an existing stack stays a no-op. Runs on Sundays in the campaign
+# timezone and reuses the daily schedule's Lambda target and role.
+resource "aws_scheduler_schedule" "weekly" {
+  count = var.weekly_roundup_enabled ? 1 : 0
+
+  name = "${local.name_prefix}-weekly"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  schedule_expression          = "cron(${split(":", var.weekly_roundup_time)[1]} ${split(":", var.weekly_roundup_time)[0]} ? * SUN *)"
+  schedule_expression_timezone = var.timezone
+
+  start_date = local.scheduler_start_date
+
+  target {
+    arn      = aws_lambda_function.orchestrator.arn
+    role_arn = aws_iam_role.scheduler.arn
+    input = jsonencode({
+      source      = "eventbridge-scheduler"
+      campaign_id = var.campaign_id
+      kind        = "weekly_roundup"
+    })
+  }
+}

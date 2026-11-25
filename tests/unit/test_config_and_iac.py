@@ -124,3 +124,39 @@ def test_articles_bucket_is_private_behind_cloudfront_oac() -> None:
     # Lambda's S3 write is scoped to PutObject on the articles bucket only.
     assert "ArticlesPutObject" in text
     assert '"s3:PutObject"' in text
+
+
+# -- News campaign packaging (weekly schedule, deploy script, example tfvars) --
+
+
+def test_weekly_schedule_is_count_gated_and_defaults_off() -> None:
+    text = _infra_text()
+    block = text.split('resource "aws_scheduler_schedule" "weekly"', 1)[1].split("\nresource ", 1)[0]
+    assert "count = var.weekly_roundup_enabled ? 1 : 0" in block
+    assert "? * SUN *" in block
+    assert 'kind        = "weekly_roundup"' in block
+    variables = (_INFRA / "variables.tf").read_text()
+    enabled = variables.split('variable "weekly_roundup_enabled"', 1)[1].split("\n}\n", 1)[0]
+    assert "default     = false" in enabled
+    assert 'default     = "18:00"' in variables.split('variable "weekly_roundup_time"', 1)[1]
+
+
+def test_example_news_tfvars_has_no_email_or_account_id() -> None:
+    import re
+
+    text = (_CONFIG / "example-news.tfvars").read_text()
+    assert "@" not in text
+    assert not re.search(r"\b\d{12}\b", text)
+    assert 'campaign_id        = "aws-news-30"' in text
+    assert "weekly_roundup_enabled = true" in text
+    assert "\u2014" not in text
+    assert "!config/example-news.tfvars" in (_REPO_ROOT / ".gitignore").read_text()
+
+
+def test_deploy_script_workspace_naming() -> None:
+    text = (_REPO_ROOT / "scripts" / "deploy.sh").read_text()
+    assert 'WORKSPACE="acct-${ACCOUNT_ID}"' in text
+    assert 'WORKSPACE="${WORKSPACE}-${WORKSPACE_SUFFIX}"' in text
+    assert 'WORKSPACE_SUFFIX=""' in text  # empty by default keeps acct-<id>
+    assert 'DEFAULT_TFVARS="${TFVARS}"' in text
+    assert "config/my-campaign.tfvars" in text

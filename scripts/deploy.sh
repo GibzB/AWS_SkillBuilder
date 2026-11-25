@@ -4,12 +4,17 @@
 #
 # Usage:
 #   scripts/deploy.sh <aws-profile> [--email you@example.com] [--plan-only]
+#                     [--tfvars FILE] [--workspace-suffix NAME]
 #
 # What it does:
 #   1. Resolves the target account from the profile (sts get-caller-identity).
 #   2. Uses a Terraform WORKSPACE named after the account ID, so each account has
 #      its own isolated state and deploys never clobber one another.
 #   3. Builds the Lambda package, then plans (and applies unless --plan-only).
+#
+# --tfvars FILE picks another config file (default config/my-campaign.tfvars).
+# --workspace-suffix NAME uses workspace acct-<id>-NAME, so a second campaign
+# stack keeps its own state next to the default acct-<id> one.
 #
 # Config comes from config/my-campaign.tfvars (gitignored). If it is missing it
 # is created from config/example.tfvars; pass --email to set the notification
@@ -19,21 +24,25 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TFVARS="${REPO_ROOT}/config/my-campaign.tfvars"
+DEFAULT_TFVARS="${TFVARS}"
 EXAMPLE="${REPO_ROOT}/config/example.tfvars"
 
 PROFILE="${1:-}"
 if [[ -z "${PROFILE}" || "${PROFILE}" == --* ]]; then
-  echo "usage: $0 <aws-profile> [--email you@example.com] [--plan-only]" >&2
+  echo "usage: $0 <aws-profile> [--email you@example.com] [--plan-only] [--tfvars FILE] [--workspace-suffix NAME]" >&2
   exit 2
 fi
 shift
 
 EMAIL=""
 PLAN_ONLY=0
+WORKSPACE_SUFFIX=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --email) EMAIL="${2:?--email needs a value}"; shift 2 ;;
     --plan-only) PLAN_ONLY=1; shift ;;
+    --tfvars) TFVARS="${2:?--tfvars needs a value}"; shift 2 ;;
+    --workspace-suffix) WORKSPACE_SUFFIX="${2:?--workspace-suffix needs a value}"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -43,6 +52,14 @@ export AWS_PROFILE="${PROFILE}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 echo "==> Target account: ${ACCOUNT_ID} (profile ${PROFILE})"
 
+# A relative --tfvars path is relative to the repo root (terraform runs in infra/).
+if [[ "${TFVARS}" != /* ]]; then
+  TFVARS="${REPO_ROOT}/${TFVARS}"
+fi
+if [[ ! -f "${TFVARS}" && "${TFVARS}" != "${DEFAULT_TFVARS}" ]]; then
+  echo "ERROR: ${TFVARS} not found. Copy a config/example-*.tfvars file there and edit it." >&2
+  exit 1
+fi
 if [[ ! -f "${TFVARS}" ]]; then
   echo "==> Creating ${TFVARS} from example.tfvars"
   cp "${EXAMPLE}" "${TFVARS}"
@@ -54,7 +71,7 @@ if [[ -n "${EMAIL}" ]]; then
   rm -f "${TFVARS}.bak"
 fi
 
-if grep -q 'you@example.com' "${TFVARS}"; then
+if grep -q -e "you@example.com" -e "REPLACE_WITH_EMAIL" "${TFVARS}"; then
   echo "ERROR: notification_email is still the placeholder. Re-run with --email you@example.com" >&2
   exit 1
 fi
@@ -64,7 +81,11 @@ echo "==> Building Lambda package"
 
 cd "${REPO_ROOT}/infra"
 terraform init -input=false
-terraform workspace select -or-create "acct-${ACCOUNT_ID}"
+WORKSPACE="acct-${ACCOUNT_ID}"
+if [[ -n "${WORKSPACE_SUFFIX}" ]]; then
+  WORKSPACE="${WORKSPACE}-${WORKSPACE_SUFFIX}"
+fi
+terraform workspace select -or-create "${WORKSPACE}"
 echo "==> Terraform workspace: $(terraform workspace show)"
 
 if [[ "${PLAN_ONLY}" -eq 1 ]]; then

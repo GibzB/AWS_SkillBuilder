@@ -34,6 +34,9 @@ DOC_PATH = (
     Path(__file__).resolve().parents[2] / "docs" / "campaign-progress.md"
 )
 
+NEWS_DOC_PATH = (
+    Path(__file__).resolve().parents[2] / "docs" / "news-campaign-progress.md"
+)
 CHECK = "✅"
 UNCHECK = "⬜"
 FIRE = "🔥"
@@ -61,6 +64,24 @@ def _is_data_row(line: str) -> bool:
     if len(cells) < N_COLS:
         return False
     return cells[COL_DAY].strip().isdigit()
+
+
+def _is_week_row(line: str) -> bool:
+    """A weekly roundup row: a table row whose first cell is ``W<number>``.
+
+    Week rows are never data rows (``_is_data_row`` needs an integer), so they
+    cannot enter the published set, the streak column or the banner.
+    """
+    if not line.lstrip().startswith("|"):
+        return False
+    cells = _split_row(line)
+    if len(cells) < N_COLS:
+        return False
+    return re.fullmatch(r"W\d+", cells[COL_DAY].strip()) is not None
+
+
+def _week_of(line: str) -> int:
+    return int(_split_row(line)[COL_DAY].strip()[1:])
 
 
 def _split_row(line: str) -> list[str]:
@@ -103,6 +124,23 @@ def set_cell(text: str, day: int, col: int, value: str) -> str:
             lines[i] = _join_row(cells, nl)
             return "".join(lines)
     raise ValueError(f"day {day} row not found in table")
+
+
+def set_week_cell(text: str, week: int, col: int, value: str) -> str:
+    """Return ``text`` with week row ``W<week>``'s column ``col`` set to ``value``.
+
+    Only week rows are searched, so a day row can never be edited by mistake.
+    Raises ValueError when the row is missing.
+    """
+    lines = text.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if _is_week_row(line) and _week_of(line) == week:
+            nl = "\n" if line.endswith("\n") else ""
+            cells = _split_row(line)
+            cells[col] = f" {value} "
+            lines[i] = _join_row(cells, nl)
+            return "".join(lines)
+    raise ValueError(f"week W{week} row not found in table")
 
 
 def _published_days(text: str) -> set[int]:
@@ -267,6 +305,26 @@ def mark_published(day: int, path: Path = DOC_PATH) -> int:
     return streak
 
 
+def mark_week_drafted(week: int, path: Path = NEWS_DOC_PATH) -> None:
+    """Tick the BC draft box for the weekly roundup row ``W<week>``."""
+    text = _read(path)
+    text = set_week_cell(text, week, COL_DRAFT, CHECK)
+    _write(path, text)
+
+
+def mark_week_published(week: int, path: Path = NEWS_DOC_PATH) -> None:
+    """Tick BC published for ``W<week>``.
+
+    The daily streak column and the banner are left alone: a roundup is not a
+    daily post, so it never extends or breaks the chain.
+    """
+    text = _read(path)
+    text = set_week_cell(text, week, COL_PUBLISHED, CHECK)
+    text = set_week_cell(text, week, COL_DRAFT, CHECK)
+    _write(path, text)
+    _log_publish(path)
+
+
 def _log_publish(path: Path) -> None:
     """Record a "publish" in the daily engagement log (best effort).
 
@@ -274,7 +332,7 @@ def _log_publish(path: Path) -> None:
     must not write into the user's home directory. A failure here never blocks
     the checklist update.
     """
-    if path != DOC_PATH:
+    if path not in (DOC_PATH, NEWS_DOC_PATH):
         return
     try:
         import engagement_store
@@ -290,7 +348,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Update docs/campaign-progress.md streak/draft/published state."
     )
-    parser.add_argument("--day", type=int, required=True, help="Campaign day number.")
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--day", type=int, help="Campaign day number.")
+    target.add_argument(
+        "--week", type=int, help="Weekly roundup number (the W<N> row of the news doc)."
+    )
     parser.add_argument(
         "--state",
         choices=["drafted", "published"],
@@ -300,10 +362,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--doc",
         type=Path,
-        default=DOC_PATH,
-        help="Path to the progress markdown (default: docs/campaign-progress.md).",
+        default=None,
+        help="Path to the progress markdown (default: docs/campaign-progress.md, "
+        "or docs/news-campaign-progress.md with --week).",
     )
     args = parser.parse_args(argv)
+    if args.week is not None:
+        doc = args.doc or NEWS_DOC_PATH
+        if args.state == "drafted":
+            mark_week_drafted(args.week, doc)
+            print(f"Marked week W{args.week} as drafted in {doc}.")
+        else:
+            mark_week_published(args.week, doc)
+            print(f"Marked week W{args.week} as published in {doc}; daily streak unchanged.")
+        return 0
+    args.doc = args.doc or DOC_PATH
 
     if args.state == "drafted":
         mark_drafted(args.day, args.doc)
