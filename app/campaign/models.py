@@ -34,6 +34,7 @@ __all__ = [
     "campaign_pk",
     "campaign_meta_sk",
     "day_sk",
+    "week_sk",
     "day_number_from_sk",
 ]
 
@@ -96,6 +97,15 @@ def day_sk(day: int) -> str:
     campaign partition (Requirements 3.1, 3.2).
     """
     return f"DAY#{day:0{DAY_SK_WIDTH}d}"
+
+
+def week_sk(week: int) -> str:
+    """Build the zero-padded ``WEEK#`` sort key for a roundup week number.
+
+    Weekly roundup rows share the campaign partition but use their own sort-key
+    prefix, so ``begins_with DAY#`` queries never see them.
+    """
+    return f"WEEK#{week:0{DAY_SK_WIDTH}d}"
 
 
 def day_number_from_sk(sk: str) -> int:
@@ -165,3 +175,11 @@ class CampaignDay:
     last_error: str = ""
     idempotency_key: str = ""
     correlation_id: str = ""
+    # News campaign: the announcement chosen for the day (stored so a retry
+    # reuses it) and the raw diagram spec produced with the article.
+    source_guid: str = ""
+    source_link: str = ""
+    source_service: str = ""
+    source_date: str = ""
+    source_text: str = ""
+    diagram_json: str = ""

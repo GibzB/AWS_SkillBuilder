@@ -123,3 +123,20 @@ def test_mock_and_builder_center_still_work_without_config() -> None:
 
     assert isinstance(select_publisher("mock"), MockPublisher)
     assert isinstance(select_publisher("builder_center"), BuilderCenterPublisher)
+
+
+def test_roundup_article_is_written_to_the_week_key() -> None:
+    from dataclasses import replace
+
+    s3 = FakeS3Client()
+    roundup = replace(_article(2), kind="roundup")
+    result = S3Publisher(s3, _BUCKET, _BASE_URL).publish_article(roundup)
+    assert result.publication_url == f"{_BASE_URL}/week/02.html"
+    assert (_BUCKET, "week/02.html") in s3.objects
+    assert (_BUCKET, "day/0002.html") not in s3.objects
+
+
+def test_daily_key_is_unchanged_for_the_default_kind() -> None:
+    s3 = FakeS3Client()
+    result = S3Publisher(s3, _BUCKET, _BASE_URL).publish_article(_article(30))
+    assert result.publication_url == f"{_BASE_URL}/day/0030.html"

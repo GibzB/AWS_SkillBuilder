@@ -318,3 +318,38 @@ def test_real_looking_ids_from_captures_are_fine() -> None:
         "```\n"
     )
     assert find_unreproducible_commands(md) == []
+
+
+# --- classify_command (news campaign) ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "kind"),
+    [
+        ("aws notaservice list-things", "unknown_service"),
+        ("aws lambda frobnicate-widgets", "unknown_operation"),
+        ("aws lambda list-functions --brand-new-flag x", "unknown_option"),
+        ("aws lambda get-function", "missing_required"),
+        ("aws s3 ls 'oops", "parse"),
+        ("aws lambda", "shape"),
+    ],
+)
+def test_classify_command_kinds(command: str, kind: str) -> None:
+    from app.validation.cli_check import classify_command
+
+    classified = classify_command(command)
+    assert classified is not None and classified[0] == kind
+
+
+def test_classify_command_ok_and_wrapper_agree() -> None:
+    from app.validation.cli_check import UNVERIFIABLE_KINDS, classify_command
+
+    assert classify_command("aws lambda list-functions") is None
+    classified = classify_command("aws lambda get-function")
+    assert classified is not None and check_command("aws lambda get-function") == classified[1]
+    assert UNVERIFIABLE_KINDS == {"unknown_service", "unknown_operation", "unknown_option"}
+
+
+def test_article_issues_carry_the_kind() -> None:
+    _, issues = check_article_commands("```bash\naws lambda frobnicate-widgets\n```\n")
+    assert [i.kind for i in issues] == ["unknown_operation"]

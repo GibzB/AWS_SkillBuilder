@@ -99,6 +99,8 @@ class NotificationContext:
     error_reason: str = ""
     remediation: str = ""
     sms_phone: str = ""
+    # News campaign: a weekly roundup sets the week number (0 means a daily).
+    week: int = 0
 
 
 class Notifier:
@@ -125,6 +127,12 @@ class Notifier:
             f"python tools/builder_publish/batch_publish.py "
             f"--from {ctx.day} --to {ctx.day} --auto-tags"
         )
+        if ctx.week:
+            next_action = (
+                f"To post the Week {ctx.week} roundup to Builder Center, run: "
+                f"python tools/builder_publish/batch_publish.py "
+                f"--news --week {ctx.week} --auto-tags"
+            )
         payload = {
             "type": "SUCCESS",
             "status": "PUBLISHED",
@@ -138,6 +146,9 @@ class Notifier:
             "daily_habit": DAILY_HABIT,
         }
         subject = f"AWS Builder Automation - Day {ctx.day} ready to post"
+        if ctx.week:
+            payload["week"] = ctx.week
+            subject = f"AWS Builder Automation - Week {ctx.week} roundup ready to post"
         self._safe_publish(ctx, subject, payload)
 
     def notify_failure(self, ctx: NotificationContext) -> None:
@@ -160,6 +171,9 @@ class Notifier:
             "timestamp": self._clock.now_iso(),
         }
         subject = f"AWS Builder Automation - Day {ctx.day} Failed"
+        if ctx.week:
+            payload["week"] = ctx.week
+            subject = f"AWS Builder Automation - Week {ctx.week} roundup Failed"
         self._safe_publish(ctx, subject, payload)
 
     # ------------------------------------------------------------------

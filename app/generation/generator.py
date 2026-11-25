@@ -24,10 +24,11 @@ from __future__ import annotations
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
-from dataclasses import replace
+from dataclasses import asdict, replace
 from importlib import resources
 from typing import Any, Callable, Protocol, TypeVar
 
+from app.diagrams.spec import ICON_CATALOG
 from app.generation.models import (
     TAGS_MAX,
     TAGS_MIN,
@@ -39,6 +40,8 @@ from app.common.errors import GenerationError
 __all__ = [
     "GENERATION_TIMEOUT_SECONDS",
     "PROMPT_RESOURCE",
+    "NEWS_PROMPT_RESOURCE",
+    "ROUNDUP_PROMPT_RESOURCE",
     "MAX_OUTPUT_TOKENS",
     "SEO_TITLE_MAX",
     "SEO_DESCRIPTION_MAX",
@@ -65,11 +68,19 @@ TIGHTEN_MAX_TOKENS = 300
 
 # Versioned prompt asset packaged with the application (Requirement 20.1).
 PROMPT_RESOURCE = ("app.prompts", "article_v2.md")
+# News campaign prompts: a daily announcement article and a weekly roundup.
+NEWS_PROMPT_RESOURCE = ("app.prompts", "news_v1.md")
+ROUNDUP_PROMPT_RESOURCE = ("app.prompts", "roundup_v1.md")
 
 # Delimiter separating the metadata JSON header from the raw Markdown body in
 # the two-part output format. Matched on its own line, tolerating surrounding
 # whitespace and optional surrounding dashes the model may add.
 _BODY_DELIMITER_RE = re.compile(r"^[ \t]*-{3,}\s*BODY\s*-{3,}[ \t]*$", re.MULTILINE)
+
+# Optional trailing diagram section (news campaign): ---DIAGRAM--- then JSON.
+_DIAGRAM_DELIMITER_RE = re.compile(
+    r"^[ \t]*-{3,}\s*DIAGRAM\s*-{3,}[ \t]*$", re.MULTILINE
+)
 
 T = TypeVar("T")
 
@@ -121,9 +132,9 @@ class ThreadTimeoutRunner:
                 ) from error
 
 
-def load_prompt_template() -> str:
-    """Load the versioned prompt template packaged with the application."""
-    package, filename = PROMPT_RESOURCE
+def load_prompt_template(resource: tuple[str, str] = PROMPT_RESOURCE) -> str:
+    """Load a versioned prompt template packaged with the application."""
+    package, filename = resource
     return resources.files(package).joinpath(filename).read_text(encoding="utf-8")
 
 
@@ -172,6 +183,9 @@ class ContentGenerator:
                 "learning_takeaway": draft.learning_takeaway,
             }
         )
+        diagram = (
+            f"\n---DIAGRAM---\n{draft.diagram_json}" if draft.diagram_json else ""
+        )
         issues = "\n".join(f"- {problem}" for problem in problems)
         revision = (
             "\n\n# Revision required\n\n"
@@ -184,7 +198,7 @@ class ContentGenerator:
             "two-part format: the metadata JSON, the ---BODY--- line, then the "
             "body.\n\n"
             f"=== PREVIOUS DRAFT START ===\n{header}\n---BODY---\n"
-            f"{draft.body_markdown}\n=== PREVIOUS DRAFT END ===\n"
+            f"{draft.body_markdown}{diagram}\n=== PREVIOUS DRAFT END ===\n"
         )
         return self._generate_from_prompt(self.build_prompt(spec) + revision, spec)
 
@@ -283,7 +297,13 @@ class ContentGenerator:
             "{tags_min}": str(TAGS_MIN),
             "{tags_max}": str(spec.tags_max),
         }
-        template = self._prompt_template
+        if spec.roundup is not None:
+            template = load_prompt_template(ROUNDUP_PROMPT_RESOURCE)
+        elif spec.news is not None:
+            template = load_prompt_template(NEWS_PROMPT_RESOURCE)
+            substitutions["{diagram_services}"] = ", ".join(sorted(ICON_CATALOG))
+        else:
+            template = self._prompt_template
         for token, value in substitutions.items():
             template = template.replace(token, value)
         request_input = {
@@ -299,6 +319,10 @@ class ContentGenerator:
                 "max_tags": spec.tags_max,
             },
         }
+        if spec.news is not None:
+            request_input["news"] = asdict(spec.news)
+        if spec.roundup is not None:
+            request_input["roundup"] = asdict(spec.roundup)
         return f"{template}\n\n# Task input\n\n```json\n{json.dumps(request_input)}\n```\n"
 
     def _parse(self, raw: str, spec: GenerationSpec) -> Article:
@@ -322,8 +346,11 @@ class ContentGenerator:
 
         # Two-part body (from the delimiter) takes precedence; otherwise fall
         # back to a legacy body_markdown field inside the JSON.
+        diagram_json = ""
         if body is None:
             body = self._require_str(payload, "body_markdown")
+        else:
+            body, diagram_json = self._split_diagram(body)
 
         if len(title.strip()) < 1 or len(title) > spec.title_max:
             raise GenerationError(
@@ -350,7 +377,22 @@ class ContentGenerator:
             tags=tags,
             learning_takeaway=takeaway,
             executed_in_aws=spec.executed_in_aws,
+            diagram_json=diagram_json,
+            kind="roundup" if spec.roundup is not None else "daily",
         )
+
+    @staticmethod
+    def _split_diagram(body: str) -> tuple[str, str]:
+        """Cut a trailing ``---DIAGRAM---`` section off the body.
+
+        Returns ``(body, diagram_json)``; the diagram is the raw text after the
+        delimiter (validated later by ``parse_spec``) and is ``""`` when the
+        delimiter is absent.
+        """
+        match = _DIAGRAM_DELIMITER_RE.search(body)
+        if match is None:
+            return body, ""
+        return body[: match.start()].strip(), body[match.end() :].strip()
 
     @staticmethod
     def _split_body(raw: str) -> tuple[str, str | None]:

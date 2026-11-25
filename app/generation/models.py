@@ -27,6 +27,10 @@ __all__ = [
     "DIFFICULTY",
     "VOICE",
     "Article",
+    "NewsContext",
+    "RoundupDaily",
+    "RoundupRegional",
+    "RoundupContext",
     "GenerationSpec",
 ]
 
@@ -62,6 +66,51 @@ class Article:
     tags: tuple[str, ...]
     learning_takeaway: str
     executed_in_aws: bool = False
+    # News campaign: the raw ``---DIAGRAM---`` JSON the model returned ("" when
+    # none) and the article kind ("daily" or "roundup").
+    diagram_json: str = ""
+    kind: str = "daily"
+
+
+@dataclass(frozen=True)
+class NewsContext:
+    """The announcement a news-campaign daily article is about."""
+
+    title: str
+    link: str
+    description_text: str
+    published_iso: str = ""
+    service: str = ""
+    related_fundamental: str = ""
+
+
+@dataclass(frozen=True)
+class RoundupDaily:
+    """One published daily that a weekly roundup summarises."""
+
+    title: str
+    url: str
+    source_link: str = ""
+    service: str = ""
+
+
+@dataclass(frozen=True)
+class RoundupRegional:
+    """A regional-availability announcement listed only in the roundup."""
+
+    title: str
+    link: str
+
+
+@dataclass(frozen=True)
+class RoundupContext:
+    """Inputs for one weekly roundup article."""
+
+    week: int
+    week_start: str
+    week_end: str
+    dailies: tuple[RoundupDaily, ...]
+    regional: tuple[RoundupRegional, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -86,3 +135,5 @@ class GenerationSpec:
     difficulty: str = DIFFICULTY
     voice: str = VOICE
     executed_in_aws: bool = False
+    news: NewsContext | None = None
+    roundup: RoundupContext | None = None

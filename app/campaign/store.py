@@ -36,6 +36,7 @@ from app.campaign.models import (
     campaign_pk,
     day_number_from_sk,
     day_sk,
+    week_sk,
 )
 from app.common.errors import IdempotencyConflict, StateTransitionError
 
@@ -44,6 +45,16 @@ __all__ = ["DynamoDBClient", "CampaignStore"]
 # Low-level DynamoDB attribute-value map, e.g. {"pk": {"S": "CAMPAIGN#abc"}}.
 AttributeValue = dict[str, Any]
 Item = dict[str, AttributeValue]
+
+# Optional news-campaign string attributes on a day row (see CampaignDay).
+_NEWS_FIELDS = (
+    "source_guid",
+    "source_link",
+    "source_service",
+    "source_date",
+    "source_text",
+    "diagram_json",
+)
 
 
 class DynamoDBClient(Protocol):
@@ -208,6 +219,36 @@ class CampaignStore:
         in ascending day order (Requirements 3.1, 3.2). Pagination is followed
         so callers always receive the complete, ordered sequence.
         """
+        return self._query_rows(campaign_id, "DAY#")
+
+    def get_week(self, campaign_id: str, week: int) -> CampaignDay | None:
+        """Load a weekly roundup row (``WEEK#NN``), or None when absent."""
+        response = self._client.get_item(
+            TableName=self._table_name,
+            Key={
+                "pk": {"S": campaign_pk(campaign_id)},
+                "sk": {"S": week_sk(week)},
+            },
+            ConsistentRead=True,
+        )
+        item = response.get("Item")
+        if not item:
+            return None
+        return self._day_from_item(cast(Item, item))
+
+    def put_week(self, week: CampaignDay) -> None:
+        """Persist a weekly roundup row; ``week.day`` holds the week number."""
+        self._client.put_item(
+            TableName=self._table_name,
+            Item=self._day_to_item(week, sk=week_sk(week.day)),
+        )
+
+    def query_weeks(self, campaign_id: str) -> list[CampaignDay]:
+        """Return all weekly roundup rows for a campaign, ordered by week."""
+        return self._query_rows(campaign_id, "WEEK#")
+
+    def _query_rows(self, campaign_id: str, prefix: str) -> list[CampaignDay]:
+        """Query every row whose sort key starts with ``prefix``, following pages."""
         days: list[CampaignDay] = []
         exclusive_start_key: Item | None = None
         while True:
@@ -216,7 +257,7 @@ class CampaignStore:
                 "KeyConditionExpression": "pk = :pk AND begins_with(sk, :day_prefix)",
                 "ExpressionAttributeValues": {
                     ":pk": {"S": campaign_pk(campaign_id)},
-                    ":day_prefix": {"S": "DAY#"},
+                    ":day_prefix": {"S": prefix},
                 },
                 "ScanIndexForward": True,
                 "ConsistentRead": True,
@@ -405,10 +446,10 @@ class CampaignStore:
             updated_at=self._get_s(item["updated_at"]),
         )
 
-    def _day_to_item(self, day: CampaignDay) -> Item:
+    def _day_to_item(self, day: CampaignDay, sk: str | None = None) -> Item:
         item: Item = {
             "pk": {"S": campaign_pk(day.campaign_id)},
-            "sk": {"S": day_sk(day.day)},
+            "sk": {"S": sk if sk is not None else day_sk(day.day)},
             "campaign_id": {"S": day.campaign_id},
             "day": {"N": str(day.day)},
             "day_state": {"S": day.day_state.value},
@@ -432,6 +473,11 @@ class CampaignStore:
             item["tags"] = {"L": []}
         if day.published_at is not None:
             item["published_at"] = {"S": day.published_at}
+        # News fields are written only when set, so legacy rows are unchanged.
+        for name in _NEWS_FIELDS:
+            value = getattr(day, name)
+            if value:
+                item[name] = {"S": value}
         return item
 
     def _day_from_item(self, item: Item) -> CampaignDay:
@@ -456,6 +502,12 @@ class CampaignStore:
             idempotency_key=self._get_s(item.get("idempotency_key")),
             correlation_id=self._get_s(item.get("correlation_id")),
             updated_at=self._get_s(item["updated_at"]),
+            source_guid=self._get_s(item.get("source_guid")),
+            source_link=self._get_s(item.get("source_link")),
+            source_service=self._get_s(item.get("source_service")),
+            source_date=self._get_s(item.get("source_date")),
+            source_text=self._get_s(item.get("source_text")),
+            diagram_json=self._get_s(item.get("diagram_json")),
         )
 
     @staticmethod

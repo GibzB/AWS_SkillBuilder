@@ -26,8 +26,15 @@ from dataclasses import dataclass
 from markdown_it import MarkdownIt
 
 from app.campaign.models import DayState
-from app.generation.models import TAGS_MAX, TAGS_MIN, Article
+from app.generation.models import (
+    TAGS_MAX,
+    TAGS_MIN,
+    Article,
+    NewsContext,
+    RoundupContext,
+)
 from app.validation.cli_check import (
+    UNVERIFIABLE_KINDS,
     check_article_commands,
     find_unreproducible_commands,
     find_unshown_files,
@@ -42,6 +49,17 @@ __all__ = [
 
 _TITLE_MAX = 255
 _DESCRIPTION_MAX = 512
+
+# News campaign: a command the checker cannot verify is allowed only under this
+# line (matched at the start of a line, after any leading whitespace).
+DISCLAIMER_PREFIX = "> **Validate before you run"
+# Number of consecutive words copied verbatim from the announcement that is
+# treated as copying rather than summarising.
+COPY_WINDOW_WORDS = 12
+_EM_DASH = "\u2014"
+_MD_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
+_WORD_RE = re.compile(r"[a-z0-9]+")
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
 @dataclass(frozen=True)
@@ -155,6 +173,9 @@ class ContentValidator:
         article: Article,
         approved_topic: str,
         existing_day_state: DayState | None,
+        *,
+        source: NewsContext | None = None,
+        roundup: RoundupContext | None = None,
     ) -> ValidationResult:
         """Validate ``article`` against every gate and collect all violations.
 
@@ -163,6 +184,10 @@ class ContentValidator:
         of that day, used for the duplicate-publication gate (Requirement 5.12).
         Returns a :class:`ValidationResult` whose ``is_valid`` is True only when
         no gate failed.
+
+        ``source`` switches on the news-campaign rules for a daily article and
+        ``roundup`` the rules for a weekly roundup; with neither the behaviour
+        is exactly the original one.
         """
         violations: list[ValidationViolation] = []
 
@@ -178,7 +203,13 @@ class ContentValidator:
         self._check_duplicate(existing_day_state, violations)
         self._check_non_portable_diagrams(article, violations)
         self._check_malformed_fences(article, violations)
-        if self._require_cli_example:
+        if roundup is not None:
+            self._check_roundup(article, roundup, violations)
+        elif source is not None:
+            self._check_news(article, source, violations)
+            if self._require_cli_example:
+                self._check_cli_examples(article, violations, news=True)
+        elif self._require_cli_example:
             self._check_cli_examples(article, violations)
 
         return ValidationResult(
@@ -428,20 +459,46 @@ class ContentValidator:
                 inside = False  # closing fence
 
     def _check_cli_examples(
-        self, article: Article, violations: list[ValidationViolation]
+        self,
+        article: Article,
+        violations: list[ValidationViolation],
+        news: bool = False,
     ) -> None:
-        """Require at least one AWS CLI command, and that all of them verify."""
+        """Require at least one AWS CLI command, and that all of them verify.
+
+        In news mode (``news=True``) a command the checker cannot verify, and a
+        missing CLI example, are accepted when the body carries the
+        "Validate before you run" disclaimer line; verifiably wrong commands
+        still fail.
+        """
+        disclaimer = news and _has_disclaimer(article.body_markdown)
         count, issues = check_article_commands(article.body_markdown)
         if count == 0:
-            violations.append(
-                ValidationViolation(
-                    "CLI_EXAMPLE_MISSING",
-                    "body_markdown",
-                    "article has no AWS CLI example in a shell code block",
+            if not disclaimer:
+                violations.append(
+                    ValidationViolation(
+                        "CLI_EXAMPLE_MISSING",
+                        "body_markdown",
+                        "article has no AWS CLI example in a shell code block",
+                    )
                 )
-            )
             return
         for issue in issues:
+            if news and issue.kind in UNVERIFIABLE_KINDS:
+                if not disclaimer:
+                    violations.append(
+                        ValidationViolation(
+                            "CLI_UNVERIFIED_NO_DISCLAIMER",
+                            "body_markdown",
+                            f"command '{issue.command[:80]}' cannot be verified "
+                            f"({issue.reason}); either add a line starting "
+                            f"'{DISCLAIMER_PREFIX}:**' directly above the code "
+                            "block telling the reader to check the commands "
+                            "against current AWS documentation, or use a "
+                            "command you are sure exists",
+                        )
+                    )
+                continue
             violations.append(
                 ValidationViolation(
                     "CLI_COMMAND_INVALID",
@@ -479,6 +536,70 @@ class ContentValidator:
             )
 
     # ------------------------------------------------------------------
+    # News campaign gates
+    # ------------------------------------------------------------------
+
+    def _check_news(
+        self,
+        article: Article,
+        source: NewsContext,
+        violations: list[ValidationViolation],
+    ) -> None:
+        """Rules for a daily news article (see the news_v1 prompt)."""
+        _check_em_dash(article, violations)
+        if not _last_line_links_to(article.body_markdown, source.link):
+            violations.append(
+                ValidationViolation(
+                    "SOURCE_LINK_MISSING",
+                    "body_markdown",
+                    "the last line of the body must be 'Read the announcement: "
+                    f"[title]({source.link})' with exactly that link",
+                )
+            )
+        if _copies_source(source.description_text, article.body_markdown):
+            violations.append(
+                ValidationViolation(
+                    "COPIED_FROM_SOURCE",
+                    "body_markdown",
+                    f"the body copies {COPY_WINDOW_WORDS} or more consecutive "
+                    "words from the announcement; rewrite that part in your "
+                    "own words",
+                )
+            )
+
+    def _check_roundup(
+        self,
+        article: Article,
+        roundup: RoundupContext,
+        violations: list[ValidationViolation],
+    ) -> None:
+        """Rules for a weekly roundup article."""
+        _check_em_dash(article, violations)
+        body = article.body_markdown
+        for daily in roundup.dailies:
+            candidates = [u for u in (daily.url, daily.source_link) if u]
+            if candidates and not any(u in body for u in candidates):
+                violations.append(
+                    ValidationViolation(
+                        "ROUNDUP_LINK_MISSING",
+                        "body_markdown",
+                        f"the roundup does not link to '{daily.title[:60]}'; "
+                        f"include {candidates[0]}",
+                    )
+                )
+        allowed = {r.link.rstrip("/") for r in roundup.regional}
+        for url in _regional_section_links(body):
+            if url.rstrip("/") not in allowed:
+                violations.append(
+                    ValidationViolation(
+                        "ROUNDUP_REGIONAL_UNKNOWN",
+                        "body_markdown",
+                        f"the regional section links to '{url[:80]}', which is "
+                        "not one of the regional announcements provided",
+                    )
+                )
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
@@ -506,3 +627,71 @@ class ContentValidator:
             return True
         content = f"{article.title}\n{article.body_markdown}".casefold()
         return any(word in content for word in significant)
+
+
+def _has_disclaimer(body: str) -> bool:
+    """True when a line starts with the "Validate before you run" disclaimer."""
+    return any(line.lstrip().startswith(DISCLAIMER_PREFIX) for line in body.splitlines())
+
+
+def _check_em_dash(article: Article, violations: list[ValidationViolation]) -> None:
+    for field_name, text in (
+        ("title", article.title),
+        ("description", article.description),
+        ("body_markdown", article.body_markdown),
+    ):
+        if _EM_DASH in text:
+            violations.append(
+                ValidationViolation(
+                    "EM_DASH",
+                    field_name,
+                    f"{field_name} contains an em dash; use a comma, colon or period",
+                )
+            )
+
+
+def _last_line_links_to(body: str, link: str) -> bool:
+    """True when the last non-empty body line has a Markdown link to ``link``."""
+    lines = [line for line in body.splitlines() if line.strip()]
+    if not lines:
+        return False
+    wanted = link.strip().rstrip("/")
+    return any(url.rstrip("/") == wanted for url in _MD_LINK_RE.findall(lines[-1]))
+
+
+def _words(text: str) -> list[str]:
+    return _WORD_RE.findall(text.casefold())
+
+
+def _copies_source(source: str, body: str) -> bool:
+    """True when ``COPY_WINDOW_WORDS`` consecutive words of ``source`` appear
+    verbatim, in order, in ``body`` (case and punctuation ignored)."""
+    source_words = _words(source)
+    body_words = _words(body)
+    n = COPY_WINDOW_WORDS
+    if len(source_words) < n or len(body_words) < n:
+        return False
+    grams = {tuple(source_words[i : i + n]) for i in range(len(source_words) - n + 1)}
+    return any(
+        tuple(body_words[i : i + n]) in grams for i in range(len(body_words) - n + 1)
+    )
+
+
+def _regional_section_links(body: str) -> list[str]:
+    """URLs of Markdown links inside a heading section that mentions "regional"."""
+    links: list[str] = []
+    in_section = False
+    level = 0
+    for line in body.splitlines():
+        heading = _HEADING_RE.match(line)
+        if heading:
+            depth = len(heading.group(1))
+            if in_section and depth <= level:
+                in_section = False
+            if not in_section and "regional" in heading.group(2).casefold():
+                in_section = True
+                level = depth
+            continue
+        if in_section:
+            links.extend(_MD_LINK_RE.findall(line))
+    return links

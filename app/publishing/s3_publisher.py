@@ -50,8 +50,14 @@ class S3Client(Protocol):
         ...
 
 
-def _object_key(day: int) -> str:
-    """Deterministic object key for a day's article HTML."""
+def _object_key(day: int, kind: str = "daily") -> str:
+    """Deterministic object key for an article's HTML.
+
+    A weekly roundup (``kind == "roundup"``, ``day`` holding the week number)
+    is written to ``week/NN.html``; every other article keeps ``day/NNNN.html``.
+    """
+    if kind == "roundup":
+        return f"week/{day:02d}.html"
     return f"day/{day:0{DAY_KEY_WIDTH}d}.html"
 
 
@@ -123,7 +129,7 @@ class S3Publisher:
         a sanitized failure result (no retry here; the Orchestrator owns retry
         policy). The input article is never mutated (Requirement 6.8).
         """
-        key = _object_key(article.day)
+        key = _object_key(article.day, article.kind)
         try:
             self._s3.put_object(
                 Bucket=self._bucket,

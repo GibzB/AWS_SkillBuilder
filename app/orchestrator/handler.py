@@ -14,6 +14,10 @@ Two invocation shapes are handled:
 * Scheduler event (``{"source": "eventbridge-scheduler", ...}``): evaluate the
   campaign state and, when it is READY or RUNNING, run the next eligible day
   (Requirements 11.1 to 11.3).
+* Weekly roundup event (``{"kind": "weekly_roundup", "campaign_id": ...,
+  "week": N}``, ``week`` optional; from the weekly schedule or a direct
+  invoke): build the news campaign's roundup for that week. Checked before the
+  daily path, and only for READY or RUNNING campaigns.
 * Command_API event (a Function URL request or a direct command object):
   dispatch through the authenticated, replay-protected :class:`CommandAPI`
   (Requirements 11.4 to 11.9, 13, 14).
@@ -40,6 +44,8 @@ from app.common.context import ExecutionContext
 from app.common.errors import ConfigurationError
 from app.common.metrics import EMFMetricsEmitter
 from app.generation.generator import ContentGenerator
+from app.news.feed import LiveNewsSource
+from app.news.roundup import RoundupRunner
 from app.notify.notifier import Notifier
 from app.orchestrator.command_api import (
     CommandAPI,
@@ -51,7 +57,13 @@ from app.orchestrator.schedule import evaluate_trigger
 from app.publishing.selection import select_publisher
 from app.validation.validator import ContentValidator
 
-__all__ = ["EngineConfig", "load_config", "BedrockRuntimeClient", "lambda_handler"]
+__all__ = [
+    "EngineConfig",
+    "load_config",
+    "BedrockRuntimeClient",
+    "lambda_handler",
+    "route_event",
+]
 
 
 @dataclass(frozen=True)
@@ -135,7 +147,7 @@ class BedrockRuntimeClient:
 
 def _build_orchestrator(
     config: EngineConfig,
-) -> tuple[Orchestrator, CampaignManager, CommandAPI, CampaignStore]:
+) -> tuple[Orchestrator, CampaignManager, CommandAPI, CampaignStore, RoundupRunner]:
     """Construct the fully wired components for one container lifecycle."""
     import boto3  # imported lazily so unit tests need no AWS SDK at import time
 
@@ -171,6 +183,7 @@ def _build_orchestrator(
     context = ExecutionContext.start()
     metrics = EMFMetricsEmitter(context, clock)
 
+    news_source = LiveNewsSource()
     orchestrator = Orchestrator(
         store=store,
         manager=manager,
@@ -181,9 +194,20 @@ def _build_orchestrator(
         clock=clock,
         metrics=metrics,
         topic_arn=config.sns_topic_arn,
+        news_source=news_source,
+    )
+    roundup_runner = RoundupRunner(
+        store=store,
+        generator=generator,
+        validator=validator,
+        publisher=publisher,
+        notifier=notifier,
+        clock=clock,
+        news_source=news_source,
+        topic_arn=config.sns_topic_arn,
     )
     command_api = CommandAPI(manager, orchestrator, clock, InMemoryNonceStore())
-    return orchestrator, manager, command_api, store
+    return orchestrator, manager, command_api, store, roundup_runner
 
 
 def _is_scheduler_event(event: dict[str, Any]) -> bool:
@@ -191,46 +215,94 @@ def _is_scheduler_event(event: dict[str, Any]) -> bool:
     return event.get("source") == "eventbridge-scheduler"
 
 
+def _is_roundup_event(event: dict[str, Any]) -> bool:
+    """Return True for a weekly roundup event (scheduled or direct)."""
+    return event.get("kind") == "weekly_roundup"
+
+
 def lambda_handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
-    """Route a Lambda invocation to scheduled execution or a command.
+    """Route a Lambda invocation to a roundup, scheduled execution or a command.
 
     A Correlation_ID is established for the execution so all logs and metrics
-    correlate (Requirement 17.1). Scheduler events run the next eligible day
-    when the campaign is READY or RUNNING; everything else is treated as a
-    Command_API request.
+    correlate (Requirement 17.1).
     """
     config = load_config()
     with ExecutionContext.start():
-        orchestrator, manager, command_api, store = _build_orchestrator(config)
+        orchestrator, manager, command_api, store, roundup_runner = _build_orchestrator(
+            config
+        )
+        return route_event(
+            event, config, orchestrator, command_api, store, roundup_runner
+        )
 
-        if _is_scheduler_event(event):
-            campaign_id = event.get("campaign_id") or config.campaign_id
-            campaign = store.get_campaign(campaign_id)  # read-only load
-            if campaign is None:
-                return {"statusCode": 404, "body": "campaign not found"}
-            decision = evaluate_trigger(campaign.campaign_state)
-            if not decision.should_execute:
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {"skipped": True, "reason": decision.skipped_reason}
-                    ),
-                }
-            result = orchestrator.execute(campaign_id)
+
+def route_event(
+    event: dict[str, Any],
+    config: EngineConfig,
+    orchestrator: Orchestrator,
+    command_api: CommandAPI,
+    store: CampaignStore,
+    roundup_runner: RoundupRunner,
+) -> dict[str, Any]:
+    """Dispatch one event. A roundup event is checked before the daily path.
+
+    Scheduler events run the next eligible day when the campaign is READY or
+    RUNNING; everything else is treated as a Command_API request.
+    """
+    if _is_roundup_event(event):
+        campaign_id = event.get("campaign_id") or config.campaign_id
+        week = event.get("week")
+        if week is not None and (
+            isinstance(week, bool) or not isinstance(week, int) or week < 1
+        ):
+            return {"statusCode": 400, "body": "week must be a positive integer"}
+        campaign = store.get_campaign(campaign_id)  # read-only load
+        if campaign is None:
+            return {"statusCode": 404, "body": "campaign not found"}
+        decision = evaluate_trigger(campaign.campaign_state)
+        if not decision.should_execute:
             return {
                 "statusCode": 200,
                 "body": json.dumps(
-                    {"outcome": result.outcome.value, "day": result.day}
+                    {"skipped": True, "reason": decision.skipped_reason}
                 ),
             }
-
-        # Command_API request.
-        request = _parse_command(event)
-        response = command_api.handle(request)
+        outcome = roundup_runner.run(campaign_id, week)
         return {
-            "statusCode": response.status_code,
-            "body": json.dumps(dict(response.body)),
+            "statusCode": 200,
+            "body": json.dumps(
+                {"outcome": outcome.outcome.value, "week": outcome.week}
+            ),
         }
+
+    if _is_scheduler_event(event):
+        campaign_id = event.get("campaign_id") or config.campaign_id
+        campaign = store.get_campaign(campaign_id)  # read-only load
+        if campaign is None:
+            return {"statusCode": 404, "body": "campaign not found"}
+        decision = evaluate_trigger(campaign.campaign_state)
+        if not decision.should_execute:
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {"skipped": True, "reason": decision.skipped_reason}
+                ),
+            }
+        result = orchestrator.execute(campaign_id)
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {"outcome": result.outcome.value, "day": result.day}
+            ),
+        }
+
+    # Command_API request.
+    request = _parse_command(event)
+    response = command_api.handle(request)
+    return {
+        "statusCode": response.status_code,
+        "body": json.dumps(dict(response.body)),
+    }
 
 
 def _parse_command(event: dict[str, Any]) -> CommandRequest:

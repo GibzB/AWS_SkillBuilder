@@ -32,8 +32,9 @@ Handling"; Requirements 3, 4, 5, 7, 8.4, 8.5, 9, 12, 15.
 
 from __future__ import annotations
 
+import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable, Protocol
 
@@ -49,8 +50,11 @@ from app.common.errors import (
     PublicationError,
 )
 from app.common.metrics import MetricName, MetricsEmitter
+from app.diagrams.spec import parse_spec
 from app.generation.generator import ContentGenerator, ThreadTimeoutRunner, TimeoutRunner
-from app.generation.models import Article, GenerationSpec
+from app.generation.models import Article, GenerationSpec, NewsContext
+from app.news.feed import FeedItem, NewsSource
+from app.news.selection import FUNDAMENTAL_KEYS, select_item, service_of
 from app.notify.notifier import NotificationContext, Notifier
 from app.publishing.adapter import PublicationResult, PublishingAdapter
 from app.validation.validator import ContentValidator, ValidationResult
@@ -75,6 +79,12 @@ ERROR_SUMMARY_MAX = 500
 _BACKOFF_BASE_SECONDS = 1.0
 # Hard bound on a single publish attempt (Requirement 7.6).
 PUBLISH_TIMEOUT_SECONDS = 60.0
+# Longest announcement text stored on a day row (news campaign).
+SOURCE_TEXT_MAX = 4000
+# The line where the diagram picture belongs in a news article body.
+_DIAGRAM_MARKER_RE = re.compile(
+    r"^[ \t]*!\[Architecture diagram\]\(diagram\.png\)[ \t]*(?:\n|$)", re.MULTILINE
+)
 
 
 class ExecutionOutcome(str, Enum):
@@ -130,6 +140,7 @@ class Orchestrator:
         topic_arn: str,
         sleeper: Sleeper | None = None,
         publish_timeout_runner: TimeoutRunner | None = None,
+        news_source: NewsSource | None = None,
     ) -> None:
         self._store = store
         self._manager = manager
@@ -144,6 +155,7 @@ class Orchestrator:
         self._publish_timeout: TimeoutRunner = (
             publish_timeout_runner or ThreadTimeoutRunner()
         )
+        self._news_source = news_source
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -241,10 +253,19 @@ class Orchestrator:
             campaign.campaign_id, day.day, current_state, DayState.GENERATING,
             self._clock.now_iso(),
         )
+        news: NewsContext | None = None
+        if campaign.content_style == "news":
+            try:
+                day, news = self._prepare_news(campaign, day)
+            except GenerationError as error:
+                return self._fail(
+                    campaign, day, DayState.GENERATING, "generation", error.message
+                )
         spec = GenerationSpec(
             campaign_id=campaign.campaign_id,
             day=day.day,
             topic=day.topic,
+            news=news,
         )
         try:
             article = self._generator.generate(spec)
@@ -252,6 +273,8 @@ class Orchestrator:
             return self._fail(
                 campaign, day, DayState.GENERATING, "generation", error.message
             )
+        if news is not None:
+            article = self._normalise_diagram(article)
 
         self._metrics.emit(MetricName.ARTICLES_GENERATED)
         self._persist_generated(campaign, day, article)
@@ -259,9 +282,11 @@ class Orchestrator:
         # --- Validation (Requirements 5.13, 5.14) ---------------------
         existing = self._store.get_day(campaign.campaign_id, day.day)
         existing_state = existing.day_state if existing else None
-        result = self._validator.validate(article, day.topic, existing_state)
+        result = self._validate(article, day.topic, existing_state, news)
         if not result.is_valid:
-            repaired = self._try_repair(spec, article, result, day.topic, existing_state)
+            repaired = self._try_repair(
+                spec, article, result, day.topic, existing_state, news
+            )
             if repaired is not None:
                 article, result = repaired
                 self._persist_generated(campaign, day, article)
@@ -277,6 +302,105 @@ class Orchestrator:
 
         # --- Publication (Requirements 7, 9, 12) ----------------------
         return self._publish(campaign, day, article)
+
+    def _validate(
+        self,
+        article: Article,
+        topic: str,
+        existing_state: DayState | None,
+        news: NewsContext | None,
+    ) -> ValidationResult:
+        """Run the validator; the news rules are passed only in news mode."""
+        if news is None:
+            return self._validator.validate(article, topic, existing_state)
+        return self._validator.validate(article, topic, existing_state, source=news)
+
+    def _prepare_news(
+        self, campaign: Campaign, day: CampaignDay
+    ) -> tuple[CampaignDay, NewsContext]:
+        """Return the day (with its announcement stored) and the news context.
+
+        A retry reuses the announcement already stored on the day row, so the
+        feed is not fetched again. Otherwise the feed is fetched, one item is
+        selected and the choice is written to the day row before generation.
+        Raises :class:`GenerationError` when the feed is unavailable or no item
+        is eligible.
+        """
+        if day.source_guid:
+            return day, self._news_context(
+                day.topic, day.source_link, day.source_text, day.source_date,
+                day.source_service,
+            )
+        if self._news_source is None:
+            raise GenerationError(
+                message="news source is not configured", reason="unavailable"
+            )
+        items = self._news_source.fetch()
+        days = self._store.query_days(campaign.campaign_id)
+        used = {d.source_guid for d in days if d.source_guid}
+        previous = next(
+            (d.source_service for d in days if d.day == day.day - 1), ""
+        )
+        item = select_item(
+            items,
+            day=day.day,
+            used_guids=used,
+            previous_service=previous,
+            now=self._clock.now(),
+        )
+        if item is None:
+            raise GenerationError(
+                message="no eligible announcement in the news feed", reason="no_topic"
+            )
+        service = service_of(item)
+        chosen = replace(
+            day,
+            day_state=DayState.GENERATING,
+            topic=item.title,
+            source_guid=item.guid,
+            source_link=item.link,
+            source_service=service,
+            source_date=item.published_iso,
+            source_text=item.description_text[:SOURCE_TEXT_MAX],
+            updated_at=self._clock.now_iso(),
+        )
+        self._store.put_day(chosen)
+        return chosen, self._news_context(
+            item.title, item.link, chosen.source_text, item.published_iso, service
+        )
+
+    @staticmethod
+    def _news_context(
+        title: str, link: str, text: str, published: str, service: str
+    ) -> NewsContext:
+        return NewsContext(
+            title=title,
+            link=link,
+            description_text=text,
+            published_iso=published,
+            service=service,
+            related_fundamental=service if service in FUNDAMENTAL_KEYS else "",
+        )
+
+    @staticmethod
+    def _normalise_diagram(article: Article) -> Article:
+        """Keep the diagram only when the spec is valid and the marker appears once.
+
+        A bad or missing diagram never fails the article: the spec is cleared
+        and any marker line is removed from the body.
+        """
+        markers = len(_DIAGRAM_MARKER_RE.findall(article.body_markdown))
+        if markers == 1 and parse_spec(article.diagram_json) is not None:
+            return article
+        if markers == 0 and not article.diagram_json:
+            return article
+        return replace(
+            article,
+            diagram_json="",
+            body_markdown=_DIAGRAM_MARKER_RE.sub("", article.body_markdown).rstrip()
+            if markers
+            else article.body_markdown,
+        )
 
     def _persist_generated(
         self, campaign: Campaign, day: CampaignDay, article: Article
@@ -301,6 +425,12 @@ class Orchestrator:
                     campaign.campaign_id, day.day
                 ),
                 updated_at=self._clock.now_iso(),
+                source_guid=day.source_guid,
+                source_link=day.source_link,
+                source_service=day.source_service,
+                source_date=day.source_date,
+                source_text=day.source_text,
+                diagram_json=article.diagram_json,
             )
         )
 
@@ -314,6 +444,7 @@ class Orchestrator:
         result: ValidationResult,
         topic: str,
         existing_state: DayState | None,
+        news: NewsContext | None = None,
     ) -> tuple[Article, ValidationResult] | None:
         """Give the generator ONE chance to fix a rejected draft.
 
@@ -331,7 +462,9 @@ class Orchestrator:
             revised = revise(spec, article, [v.message for v in result.violations])
         except GenerationError:
             return None
-        revised_result = self._validator.validate(revised, topic, existing_state)
+        if news is not None:
+            revised = self._normalise_diagram(revised)
+        revised_result = self._validate(revised, topic, existing_state, news)
         if not revised_result.is_valid:
             return None
         return revised, revised_result

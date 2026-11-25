@@ -24,7 +24,14 @@ from dataclasses import dataclass
 from botocore import xform_name
 from botocore.session import get_session
 
-__all__ = ["CliIssue", "extract_aws_commands", "check_command", "check_article_commands"]
+__all__ = [
+    "CliIssue",
+    "UNVERIFIABLE_KINDS",
+    "extract_aws_commands",
+    "classify_command",
+    "check_command",
+    "check_article_commands",
+]
 
 _SHELL_LANGS = {"bash", "sh", "shell", "zsh", "console", "terminal", ""}
 
@@ -80,10 +87,11 @@ _GLOBAL_FLAGS = {
 
 @dataclass(frozen=True)
 class CliIssue:
-    """A problem with one command: the command text and a short reason."""
+    """A problem with one command: the command text, a short reason and its kind."""
 
     command: str
     reason: str
+    kind: str = ""
 
 
 def _quotes_balanced(text: str) -> bool:
@@ -134,16 +142,26 @@ def extract_aws_commands(markdown: str) -> list[str]:
     return commands
 
 
-def check_command(command: str) -> str | None:
-    """Return a reason the command is invalid, or ``None`` if it checks out."""
+# Kinds that mean "botocore here may simply be older than the command": the
+# command cannot be verified, which is not proof that it is wrong.
+UNVERIFIABLE_KINDS = frozenset({"unknown_service", "unknown_operation", "unknown_option"})
+
+
+def classify_command(command: str) -> tuple[str, str] | None:
+    """Return ``(kind, reason)`` if the command fails verification, else ``None``.
+
+    ``unknown_service``, ``unknown_operation`` and ``unknown_option`` are
+    *unverifiable* (the checker's botocore may predate the command);
+    ``parse``, ``shape`` and ``missing_required`` are hard failures.
+    """
     try:
         tokens = shlex.split(command, comments=True)
     except ValueError as error:
-        return f"cannot parse command ({error})"
+        return ("parse", f"cannot parse command ({error})")
     if len(tokens) >= 2 and tokens[0] == "aws" and tokens[1] in _CUSTOM_SERVICES:
         return None
     if len(tokens) < 3 or tokens[0] != "aws":
-        return "expected 'aws <service> <command>'"
+        return ("shape", "expected 'aws <service> <command>'")
 
     # Skip leading global flags between 'aws' and the service (rare).
     service_cli, op_cli = tokens[1], tokens[2]
@@ -157,12 +175,12 @@ def check_command(command: str) -> str | None:
     service = _SERVICE_ALIASES.get(service_cli, service_cli)
     session = get_session()
     if service not in session.get_available_services():
-        return f"unknown service '{service_cli}'"
+        return ("unknown_service", f"unknown service '{service_cli}'")
     model = session.get_service_model(service)
 
     operations = {xform_name(name, "-"): name for name in model.operation_names}
     if op_cli not in operations:
-        return f"'{service_cli}' has no command '{op_cli}'"
+        return ("unknown_operation", f"'{service_cli}' has no command '{op_cli}'")
     shape = model.operation_model(operations[op_cli]).input_shape
 
     members = shape.members if shape is not None else {}
@@ -180,7 +198,7 @@ def check_command(command: str) -> str | None:
         if token.startswith("--"):
             flag = token[2:].split("=", 1)[0]
             if flag not in valid and flag not in _GLOBAL_FLAGS:
-                return f"'{op_cli}' has no option '--{flag}'"
+                return ("unknown_option", f"'{op_cli}' has no option '--{flag}'")
             given.add(flag)
 
     skeleton = {"cli-input-json", "cli-input-yaml", "generate-cli-skeleton"} & given
@@ -192,8 +210,17 @@ def check_command(command: str) -> str | None:
             if not (alternatives.get(name, set()) & given)
         )
         if missing:
-            return "missing required option(s): " + ", ".join(f"--{m}" for m in missing)
+            return (
+                "missing_required",
+                "missing required option(s): " + ", ".join(f"--{m}" for m in missing),
+            )
     return None
+
+
+def check_command(command: str) -> str | None:
+    """Return a reason the command is invalid, or ``None`` if it checks out."""
+    classified = classify_command(command)
+    return None if classified is None else classified[1]
 
 
 def find_unshown_files(markdown: str) -> list[str]:
@@ -259,8 +286,8 @@ def check_article_commands(markdown: str) -> tuple[int, list[CliIssue]]:
     """Return (number of aws commands found, list of issues)."""
     commands = extract_aws_commands(markdown)
     issues = [
-        CliIssue(cmd, reason)
+        CliIssue(cmd, classified[1], classified[0])
         for cmd in commands
-        if (reason := check_command(cmd)) is not None
+        if (classified := classify_command(cmd)) is not None
     ]
     return len(commands), issues
